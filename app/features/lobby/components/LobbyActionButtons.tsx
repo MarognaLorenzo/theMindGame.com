@@ -23,12 +23,12 @@ export function LobbyActionButtons({
       >
         Join Lobby
       </button>
-      <button
+      {/* <button
         onClick={onDisconnect}
         className="rounded-lg border border-slate-600 px-4 py-2 font-semibold text-slate-300 transition hover:bg-slate-800"
       >
         Disconnect
-      </button>
+      </button> */}
     </div>
   );
 }

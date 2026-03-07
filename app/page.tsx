@@ -26,6 +26,7 @@ export default function Home() {
     disconnectSocket,
     startGame,
     clearMessages,
+    onCardPlay,
   } = useLobbyClient();
 
   return (
@@ -65,6 +66,7 @@ export default function Home() {
               myPlayerId={myPlayerId}
               isHost={isHost}
               onStartGame={startGame}
+              onCardPlay={onCardPlay}
             />
           ) : null
         ) : null}

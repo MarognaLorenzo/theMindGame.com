@@ -167,14 +167,24 @@ export function useLobbyClient() {
     connectToLobby(lobbyId);
   }
 
-  function startGame() {
+  function validConnection(): boolean {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       setError("You are not connected to a lobby.");
-      return;
+      return false;
     }
+    return true;
+  }
 
-    wsRef.current.send(JSON.stringify({ type: "START" }));
+  function startGame() {
+    if (!validConnection()) return;
+    wsRef?.current?.send(JSON.stringify({ type: "START" }));
     appendMessage("Sent: START");
+  }
+
+  function onCardPlay(card: number) {
+    if (!validConnection()) return;
+    wsRef?.current?.send(JSON.stringify({ type: "PLAY_CARD", card }));
+    appendMessage(`Sent: PLAY_CARD ${card}`);
   }
 
   useEffect(() => {
@@ -203,5 +213,6 @@ export function useLobbyClient() {
     disconnectSocket,
     startGame,
     clearMessages,
+    onCardPlay,
   };
 }

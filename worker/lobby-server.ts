@@ -111,12 +111,13 @@ export class LobbyServer extends DurableObject {
     void wasClean;
   }
 
-  handlePlayCard(ws: WebSocket, playedCard: number) {
+  async handlePlayCard(ws: WebSocket, playedCard: number) {
     void ws;
     const isAccepted = playCard(this.lobby, playedCard);
 
     if (isAccepted) {
-      this.broadcast({ type: "CARD_ACCEPTED", card: playedCard });
+      await this.saveLobbyState();
+      this.sendLobbyState();
     } else {
       this.broadcast({
         type: "LIFE_LOST",
@@ -160,7 +161,7 @@ export class LobbyServer extends DurableObject {
     this.sendLobbyState();
   }
 
-  handleUseShuriken(ws: WebSocket) {
+  async handleUseShuriken(ws: WebSocket) {
     void ws;
     const lowestCard = useShuriken(this.lobby);
     if (lowestCard !== null) {

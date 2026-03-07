@@ -2,9 +2,11 @@ import type { SocketLobbyState } from "../../lobby/types";
 
 interface PlayingViewProps {
   lobby: SocketLobbyState;
+  myPlayerId: string | null;
+  onCardPlay: (card: number) => void;
 }
 
-export function PlayingView({ lobby }: PlayingViewProps) {
+export function PlayingView({ lobby, myPlayerId, onCardPlay }: PlayingViewProps) {
   return (
     <section className="mt-8 rounded-xl border border-emerald-300/30 bg-emerald-950/20 p-5">
       <h2 className="text-lg font-bold text-emerald-200">Game In Progress</h2>
@@ -31,6 +33,27 @@ export function PlayingView({ lobby }: PlayingViewProps) {
           </p>
         </div>
       </div>
+        <div className="mt-6">
+            <h3 className="text-sm font-semibold text-emerald-300">Your Hand</h3>
+            <div className="mt-3 flex gap-2">
+                {lobby.players.filter((p) => p.id === myPlayerId)[0]?.hand.map((card) => (
+                    <div key={card} className="rounded-lg border border-emerald-400/20 bg-slate-900/80 px-4 py-2 text-xl font-bold text-emerald-100">
+                        {card}
+                    </div>
+                ))}
+            </div>
+        </div>
+        <button
+          onClick={() => {
+            const myPlayer = lobby.players.find((p) => p.id === myPlayerId);
+            if (myPlayer && myPlayer.hand.length > 0) {
+              onCardPlay(Math.min(...myPlayer.hand)); // Example: play the first card in hand
+            }
+          }}
+          className="mt-6 rounded border border-emerald-400 px-3 py-2 text-sm text-emerald-200 hover:bg-emerald-500/20"
+        >
+          Play Lowest Card
+        </button>
     </section>
   );
 }
