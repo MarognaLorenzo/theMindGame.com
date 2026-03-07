@@ -15,6 +15,7 @@ export interface Lobby {
   lives: number;
   shurikens: number;
   currentLevel: number;
+  winningLevel: number;
   state: "waiting" | "playing" | "won" | "lost";
   hostPlayerId: string | null;
 }
@@ -23,9 +24,10 @@ export function createInitialLobby(): Lobby {
   return {
     players: [],
     discardPile: [],
-    lives: 3,
-    shurikens: 2,
-    currentLevel: 1,
+    lives: 0,
+    shurikens: 0,
+    currentLevel: 0,
+    winningLevel: 0,
     state: "waiting",
     hostPlayerId: null,
   };
@@ -63,7 +65,7 @@ export function playCard(lobby: Lobby, playedCard: number): boolean {
 
     // check for level completion
     if (lobby.players.every((player) => player.hand.length === 0)) {
-      if (lobby.currentLevel >= 10) {
+      if (lobby.currentLevel >= lobby.winningLevel) {
         lobby.state = "won";
       } else {
         lobby.currentLevel += 1;
@@ -105,6 +107,12 @@ export function startGame(lobby: Lobby): boolean {
   lobby.lives = lobby.players.length;
   lobby.shurikens = 1;
   lobby.currentLevel = 1;
+  switch (lobby.players.length) {
+    case 2: lobby.winningLevel = 12; break;
+    case 3: lobby.winningLevel = 10; break;
+    case 4: lobby.winningLevel = 8; break;
+    default: lobby.winningLevel = 8; break;
+  }
   dealCards(lobby);
   return true;
 }
