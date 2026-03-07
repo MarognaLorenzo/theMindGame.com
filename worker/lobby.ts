@@ -66,7 +66,9 @@ export function playCard(lobby: Lobby, playedCard: number): boolean {
       if (lobby.currentLevel >= 10) {
         lobby.state = "won";
       } else {
-        dealNewLevel(lobby);
+        lobby.currentLevel += 1;
+        dealCards(lobby);
+        assignRewards(lobby);
       }
     }
 
@@ -102,13 +104,12 @@ export function startGame(lobby: Lobby): boolean {
   lobby.state = "playing";
   lobby.lives = lobby.players.length;
   lobby.shurikens = 1;
-  lobby.currentLevel = 0;
-  dealNewLevel(lobby);
+  lobby.currentLevel = 1;
+  dealCards(lobby);
   return true;
 }
 
-export function dealNewLevel(lobby: Lobby) {
-  lobby.currentLevel += 1;
+export function dealCards(lobby: Lobby) {
   const deck = Array.from({ length: 100 }, (_, i) => i + 1).sort(
     () => Math.random() - 0.5,
   );
@@ -119,4 +120,12 @@ export function dealNewLevel(lobby: Lobby) {
       .filter((_, i) => i % numPlayers === index)
       .slice(0, lobby.currentLevel);
   });
+}
+
+export function assignRewards(lobby: Lobby) {
+    if ([2, 5, 8].includes(lobby.currentLevel)) {
+      lobby.shurikens = Math.min(lobby.shurikens + 1, 3);
+    } else if ([3, 6, 9].includes(lobby.currentLevel)) {
+      lobby.lives = Math.min(lobby.lives + 1, 5);
+    }
 }
