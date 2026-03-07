@@ -17,3 +17,6 @@ new_sqlite_classes = ["LobbyServer"]
 [[migrations]]
 tag = "v2"
 new_sqlite_classes = ["LobbyRegistry"]
+
+[vars]
+ALLOWED_ORIGINS = "http://localhost:3000"

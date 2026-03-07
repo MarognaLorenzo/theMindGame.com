@@ -4,17 +4,49 @@ import { LobbyRegistry } from "./lobby-registry.ts";
 export interface Env {
   LOBBY_SERVER: DurableObjectNamespace<LobbyServer>;
   LOBBY_REGISTRY: DurableObjectNamespace<LobbyRegistry>;
+  ALLOWED_ORIGINS?: string;
 }
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "http://localhost:3000",
-  "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-};
+const DEFAULT_ALLOWED_ORIGINS = ["http://localhost:3000"];
 
-function withCors(response: Response): Response {
+function resolveAllowedOrigins(env: Env): string[] {
+  const raw = env.ALLOWED_ORIGINS?.trim();
+  if (!raw) {
+    return DEFAULT_ALLOWED_ORIGINS;
+  }
+
+  return raw
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+}
+
+function buildCorsHeaders(request: Request, env: Env): Record<string, string> {
+  const origin = request.headers.get("Origin")?.trim();
+  const allowedOrigins = resolveAllowedOrigins(env);
+  const allowAnyOrigin = allowedOrigins.includes("*");
+
+  let allowedOrigin = DEFAULT_ALLOWED_ORIGINS[0];
+  if (allowAnyOrigin) {
+    allowedOrigin = "*";
+  } else if (origin && allowedOrigins.includes(origin)) {
+    allowedOrigin = origin;
+  } else if (allowedOrigins.length > 0) {
+    allowedOrigin = allowedOrigins[0];
+  }
+
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    Vary: "Origin",
+  };
+}
+
+function withCors(response: Response, request: Request, env: Env): Response {
   const headers = new Headers(response.headers);
-  Object.entries(CORS_HEADERS).forEach(([key, value]) => {
+  const corsHeaders = buildCorsHeaders(request, env);
+  Object.entries(corsHeaders).forEach(([key, value]) => {
     headers.set(key, value);
   });
 
@@ -113,7 +145,10 @@ async function createShortCodeMapping(
 const worker = {
   async fetch(request: Request, env: Env): Promise<Response> {
     if (request.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers: CORS_HEADERS });
+      return new Response(null, {
+        status: 204,
+        headers: buildCorsHeaders(request, env),
+      });
     }
 
     const url = new URL(request.url);
@@ -127,6 +162,8 @@ const worker = {
       if (!shortLobbyId) {
         return withCors(
           new Response("Could not allocate lobby code", { status: 500 }),
+          request,
+          env,
         );
       }
 
@@ -134,6 +171,8 @@ const worker = {
         new Response(JSON.stringify({ lobbyId: shortLobbyId }), {
           headers: { "Content-Type": "application/json" },
         }),
+        request,
+        env,
       );
     }
 
@@ -144,6 +183,8 @@ const worker = {
       if (!lobbyIdString || !name) {
         return withCors(
           new Response("Missing lobbyId or name", { status: 400 }),
+          request,
+          env,
         );
       }
 
@@ -153,6 +194,8 @@ const worker = {
         if (!mappedLobbyId) {
           return withCors(
             new Response("Unknown lobby ID", { status: 404 }),
+            request,
+            env,
           );
         }
         resolvedLobbyId = mappedLobbyId;
@@ -163,7 +206,7 @@ const worker = {
       return lobbyStub.fetch(request);
     }
 
-    return withCors(new Response("Not Found", { status: 404 }));
+    return withCors(new Response("Not Found", { status: 404 }), request, env);
   },
 };
 
