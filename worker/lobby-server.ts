@@ -7,7 +7,7 @@ import {
   playCard,
   removePlayer,
   startGame,
-  useShuriken,
+  useShuriken as spendShuriken,
 } from "./lobby.ts";
 import type { Lobby, Player } from "./lobby.ts";
 
@@ -163,7 +163,7 @@ export class LobbyServer extends DurableObject {
 
   async handleUseShuriken(ws: WebSocket) {
     void ws;
-    const lowestCard = useShuriken(this.lobby);
+    const lowestCard = spendShuriken(this.lobby);
     if (lowestCard !== null) {
       this.sendLobbyState();
     }
