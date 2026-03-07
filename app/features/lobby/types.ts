@@ -19,6 +19,7 @@ export interface SocketJoinedMessage {
   type: "JOINED";
   playerId: string;
   playerName: string;
+  resumeToken?: string | null;
 }
 
 export interface SocketLobbyStateMessage {

@@ -4,7 +4,9 @@ import type { Lobby, Player } from "./lobby.ts";
 // Reconcile the lobby's player list with the currently connected WebSockets.
 // This ensures that if a player disconnects and reconnects, they retain their player ID and hand.
 export function reconcilePlayersFromSockets(lobby: Lobby, sockets: WebSocket[]) {
-  const playersById = new Map<string, Player>();
+  const playersById = new Map<string, Player>(
+    lobby.players.map((player) => [player.id, player]),
+  );
 
   for (const ws of sockets) {
     const attachment = readPlayerAttachment(ws);
@@ -12,7 +14,7 @@ export function reconcilePlayersFromSockets(lobby: Lobby, sockets: WebSocket[]) 
       continue;
     }
 
-    const existing = lobby.players.find((p) => p.id === attachment.playerId);
+    const existing = playersById.get(attachment.playerId);
     playersById.set(
       attachment.playerId,
       existing ?? { id: attachment.playerId, name: attachment.playerName, hand: [] },

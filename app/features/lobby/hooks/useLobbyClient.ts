@@ -9,6 +9,92 @@ interface CreateLobbyResponse {
   lobbyId?: string;
 }
 
+interface StoredLobbySession {
+  lobbyId: string;
+  playerId: string;
+  playerName: string;
+  resumeToken: string;
+}
+
+const SESSION_STORAGE_KEY = "mind-game:lobby-session";
+
+function loadStoredSession(): StoredLobbySession | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<StoredLobbySession>;
+    if (
+      !parsed.lobbyId ||
+      !parsed.playerId ||
+      !parsed.playerName ||
+      !parsed.resumeToken
+    ) {
+      return null;
+    }
+
+    return {
+      lobbyId: parsed.lobbyId,
+      playerId: parsed.playerId,
+      playerName: parsed.playerName,
+      resumeToken: parsed.resumeToken,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function persistSession(session: StoredLobbySession) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+}
+
+function clearSession() {
+  if (typeof window === "undefined") {
+    return;
+  }
+  window.localStorage.removeItem(SESSION_STORAGE_KEY);
+}
+
+function getStoredSessionForLobby(
+  targetLobbyId: string,
+  playerName: string,
+): StoredLobbySession | null {
+  const session = loadStoredSession();
+  if (!session) {
+    return null;
+  }
+
+  if (session.lobbyId.trim().toUpperCase() !== targetLobbyId.trim().toUpperCase()) {
+    return null;
+  }
+
+  if (session.playerName.trim().toLowerCase() !== playerName.trim().toLowerCase()) {
+    return null;
+  }
+
+  return session;
+}
+
+interface ConnectOptions {
+  resumeToken?: string;
+  playerNameOverride?: string;
+  autoReconnect?: boolean;
+}
+
+interface DisconnectOptions {
+  clearStoredSession?: boolean;
+  allowReconnect?: boolean;
+}
+
 export function useLobbyClient() {
   const [name, setName] = useState("");
   const [lobbyId, setLobbyId] = useState("");
@@ -20,6 +106,8 @@ export function useLobbyClient() {
   const [isConnected, setIsConnected] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimerRef = useRef<number | null>(null);
+  const allowAutoReconnectRef = useRef(true);
 
   const workerBaseUrl =
     process.env.NEXT_PUBLIC_WORKER_URL?.trim() || DEFAULT_WORKER_URL;
@@ -43,46 +131,93 @@ export function useLobbyClient() {
     setMessages([]);
   }
 
-  function disconnectSocket() {
+  function clearReconnectTimer() {
+    if (reconnectTimerRef.current !== null) {
+      window.clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+  }
+
+  function disconnectSocket(options?: DisconnectOptions) {
+    const clearStoredSession = options?.clearStoredSession ?? true;
+    const allowReconnect = options?.allowReconnect ?? false;
+
+    clearReconnectTimer();
+    allowAutoReconnectRef.current = allowReconnect;
+
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
     }
+
+    if (clearStoredSession) {
+      clearSession();
+    }
+
     setIsConnected(false);
     setMyPlayerId(null);
     setLobby(null);
   }
 
-  function connectToLobby(targetLobbyId: string) {
+  function scheduleReconnect() {
+    clearReconnectTimer();
+
+    const session = loadStoredSession();
+    if (!session) {
+      return;
+    }
+
+    reconnectTimerRef.current = window.setTimeout(() => {
+      connectToLobby(session.lobbyId, {
+        resumeToken: session.resumeToken,
+        playerNameOverride: session.playerName,
+        autoReconnect: true,
+      });
+    }, 1_500);
+  }
+
+  function connectToLobby(targetLobbyId: string, options?: ConnectOptions) {
     setError("");
 
-    if (!name.trim()) {
+    const resolvedName = options?.playerNameOverride?.trim() || name.trim();
+    const targetId = targetLobbyId.trim();
+
+    if (!resolvedName) {
       setError("Please enter your name.");
       return;
     }
 
-    if (!targetLobbyId.trim()) {
+    if (!targetId) {
       setError("Please enter a lobby ID.");
       return;
     }
 
-    disconnectSocket();
+    disconnectSocket({ clearStoredSession: false, allowReconnect: false });
+    allowAutoReconnectRef.current = true;
 
     const url = new URL(`${wsBaseUrl}/api/join`);
-    url.searchParams.set("lobbyId", targetLobbyId.trim());
-    url.searchParams.set("name", name.trim());
+    url.searchParams.set("lobbyId", targetId);
+    url.searchParams.set("name", resolvedName);
 
-    setStatus("Connecting to lobby...");
+    setStatus(options?.autoReconnect ? "Reconnecting to lobby..." : "Connecting to lobby...");
 
     const ws = new WebSocket(url.toString());
     wsRef.current = ws;
 
     ws.onopen = () => {
       setIsConnected(true);
-      setStatus(`Connected to lobby ${targetLobbyId}`);
-      appendMessage(`Connected to lobby ${targetLobbyId}`);
-      ws.send(JSON.stringify({ type: "JOIN" }));
-      appendMessage("Sent: JOIN");
+      setStatus(`Connected to lobby ${targetId}`);
+      appendMessage(`Connected to lobby ${targetId}`);
+      setLobbyId(targetId);
+      setName(resolvedName);
+
+      ws.send(
+        JSON.stringify({
+          type: "JOIN",
+          ...(options?.resumeToken ? { resumeToken: options.resumeToken } : {}),
+        }),
+      );
+      appendMessage(options?.resumeToken ? "Sent: JOIN (resume)" : "Sent: JOIN");
     };
 
     ws.onmessage = (event) => {
@@ -99,6 +234,15 @@ export function useLobbyClient() {
 
         if (data.type === "JOINED") {
           setMyPlayerId(data.playerId);
+
+          if (data.resumeToken) {
+            persistSession({
+              lobbyId: targetId,
+              playerId: data.playerId,
+              playerName: data.playerName,
+              resumeToken: data.resumeToken,
+            });
+          }
         }
 
         if (data.type === "LOBBY_STATE") {
@@ -107,6 +251,9 @@ export function useLobbyClient() {
 
         if (data.type === "ERROR") {
           setError(data.message);
+          if (data.message.toLowerCase().includes("session expired")) {
+            clearSession();
+          }
         }
       } catch {
         // Keep non-JSON payloads in the raw log only.
@@ -125,6 +272,10 @@ export function useLobbyClient() {
       appendMessage("Socket closed");
       if (wsRef.current === ws) {
         wsRef.current = null;
+      }
+
+      if (allowAutoReconnectRef.current) {
+        scheduleReconnect();
       }
     };
   }
@@ -164,7 +315,14 @@ export function useLobbyClient() {
 
   function joinLobby() {
     setError("");
-    connectToLobby(lobbyId);
+
+    const playerName = name.trim();
+    const targetLobbyId = lobbyId.trim();
+    const storedSession = getStoredSessionForLobby(targetLobbyId, playerName);
+
+    connectToLobby(lobbyId, {
+      ...(storedSession ? { resumeToken: storedSession.resumeToken } : {}),
+    });
   }
 
   function validConnection(): boolean {
@@ -194,8 +352,24 @@ export function useLobbyClient() {
   }
 
   useEffect(() => {
+    const session = loadStoredSession();
+    if (!session) {
+      return;
+    }
+
+    setName(session.playerName);
+    setLobbyId(session.lobbyId);
+    setStatus(`Restoring session for lobby ${session.lobbyId}...`);
+    connectToLobby(session.lobbyId, {
+      resumeToken: session.resumeToken,
+      playerNameOverride: session.playerName,
+      autoReconnect: true,
+    });
+  }, []);
+
+  useEffect(() => {
     return () => {
-      disconnectSocket();
+      disconnectSocket({ clearStoredSession: false, allowReconnect: false });
     };
   }, []);
 
