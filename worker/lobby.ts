@@ -1,12 +1,15 @@
-import { DurableObject } from "cloudflare:workers";
-
-interface Player {
+export interface Player {
   id: string;
   name: string;
   hand: number[];
 }
 
-interface Lobby {
+export interface PlayerAttachment {
+  playerId: string;
+  playerName: string;
+}
+
+export interface Lobby {
   players: Player[];
   discardPile: number[];
   lives: number;
@@ -16,15 +19,8 @@ interface Lobby {
   hostPlayerId: string | null;
 }
 
-interface PlayerAttachment {
-  playerId: string;
-  playerName: string;
-}
-
-export class LobbyServer extends DurableObject {
-  private initialized = false;
-
-  private lobby: Lobby = {
+export function createInitialLobby(): Lobby {
+  return {
     players: [],
     discardPile: [],
     lives: 3,
@@ -33,261 +29,94 @@ export class LobbyServer extends DurableObject {
     state: "waiting",
     hostPlayerId: null,
   };
+}
 
-  private async ensureLoaded() {
-    if (this.initialized) {
-      return;
-    }
+export function addPlayer(lobby: Lobby, playerName: string): Player {
+  const playerId = crypto.randomUUID();
+  const newPlayer: Player = { id: playerId, name: playerName, hand: [] };
+  lobby.players.push(newPlayer);
 
-    const storedLobby = await this.ctx.storage.get<Lobby>("lobby-state");
-    if (storedLobby) {
-      this.lobby = storedLobby;
-    }
-
-    this.reconcilePlayersFromSockets();
-    this.initialized = true;
-    await this.saveLobbyState();
+  if (!lobby.hostPlayerId) {
+    lobby.hostPlayerId = playerId;
   }
 
-  private async saveLobbyState() {
-    await this.ctx.storage.put("lobby-state", this.lobby);
+  return newPlayer;
+}
+
+export function removePlayer(lobby: Lobby, playerId: string) {
+  lobby.players = lobby.players.filter((player) => player.id !== playerId);
+
+  if (lobby.hostPlayerId === playerId) {
+    lobby.hostPlayerId = lobby.players[0]?.id ?? null;
   }
+}
 
-  private getAttachment(ws: WebSocket): PlayerAttachment | null {
-    const attachment = ws.deserializeAttachment() as PlayerAttachment | null;
-    if (!attachment?.playerId || !attachment?.playerName) {
-      return null;
-    }
+export function playCard(lobby: Lobby, playedCard: number): boolean {
+  const allCards = lobby.players.flatMap((player) => player.hand);
+  const minCard = Math.min(...allCards);
 
-    return attachment;
-  }
-
-  private reconcilePlayersFromSockets() {
-    const playersById = new Map<string, Player>();
-
-    for (const ws of this.ctx.getWebSockets()) {
-      const attachment = this.getAttachment(ws);
-      if (!attachment) {
-        continue;
-      }
-
-      const existing = this.lobby.players.find((p) => p.id === attachment.playerId);
-      playersById.set(
-        attachment.playerId,
-        existing ?? { id: attachment.playerId, name: attachment.playerName, hand: [] },
-      );
-    }
-
-    this.lobby.players = Array.from(playersById.values());
-
-    if (
-      this.lobby.hostPlayerId &&
-      !this.lobby.players.some((p) => p.id === this.lobby.hostPlayerId)
-    ) {
-      this.lobby.hostPlayerId = null;
-    }
-
-    if (!this.lobby.hostPlayerId && this.lobby.players.length > 0) {
-      this.lobby.hostPlayerId = this.lobby.players[0].id;
-    }
-  }
-
-  async fetch(request: Request): Promise<Response> {
-    await this.ensureLoaded();
-
-    const webSocketPair = new WebSocketPair();
-    const [client, server] = Object.values(webSocketPair);
-
-    const url = new URL(request.url);
-    const playerName = url.searchParams.get("name") || "Anonymous";
-
-    this.ctx.acceptWebSocket(server, [playerName]);
-
-    return new Response(null, { status: 101, webSocket: client });
-  }
-
-  async webSocketMessage(ws: WebSocket, message: string) {
-    await this.ensureLoaded();
-
-    const playerName = this.ctx.getTags(ws)?.[0] || "Unknown";
-    const data = JSON.parse(message);
-    switch (data.type) {
-      case "JOIN":
-        await this.handleJoinLobby(ws, playerName);
-        break;
-      case "START":
-        this.handleStartGame(ws);
-        break;
-      case "PLAY_CARD":
-        this.handlePlayCard(ws, data.card);
-        break;
-      case "USE_SHURIKEN":
-        this.handleUseShuriken(ws);
-        break;
-      default:
-        console.error("Unknown message type:", data.type);
-    }
-  }
-
-  broadcast(data: object) {
-    for (const ws of this.ctx.getWebSockets()) {
-      ws.send(JSON.stringify(data));
-    }
-  }
-
-  sendLobbyState() {
-    this.reconcilePlayersFromSockets();
-    this.broadcast({
-      type: "LOBBY_STATE",
-      lobby: {...this.lobby,
-        players: this.lobby.players.map((p) => ({
-          id: p.id,
-          name: p.name,
-          handSize: p.hand.length,
-        })),
-      },
+  if (playedCard === minCard) {
+    lobby.players.forEach((player) => {
+      player.hand = player.hand.filter((card) => card !== playedCard);
     });
-  }
+    lobby.discardPile.push(playedCard);
 
-  async webSocketClose(
-    ws: globalThis.WebSocket,
-    code: number,
-    reason: string,
-    wasClean: boolean,
-  ) {
-    await this.ensureLoaded();
-
-    const leavingPlayerId = this.getAttachment(ws)?.playerId;
-    if (leavingPlayerId) {
-      this.lobby.players = this.lobby.players.filter(
-        (player) => player.id !== leavingPlayerId,
-      );
-
-      if (this.lobby.hostPlayerId === leavingPlayerId) {
-        this.lobby.hostPlayerId = this.lobby.players[0]?.id ?? null;
+    // check for level completion
+    if (lobby.players.every((player) => player.hand.length === 0)) {
+      if (lobby.currentLevel >= 10) {
+        lobby.state = "won";
+      } else {
+        dealNewLevel(lobby);
       }
-
-      await this.saveLobbyState();
-      this.sendLobbyState();
     }
 
-    void code;
-    void reason;
-    void wasClean;
+    return true;
   }
 
-  handlePlayCard(ws: WebSocket, playedCard: number) {
-    void ws;
-    const allCards = this.lobby.players.flatMap((p) => p.hand);
-    const minCard = Math.min(...allCards);
+  lobby.lives -= 1;
+  return false;
+}
 
-    if (playedCard === minCard) {
-      this.lobby.players.forEach((p) => {
-        p.hand = p.hand.filter((c) => c !== playedCard);
-      });
-      this.lobby.discardPile.push(playedCard);
-      this.broadcast({ type: "CARD_ACCEPTED", card: playedCard });
-    } else {
-      this.lobby.lives -= 1;
-      this.broadcast({
-        type: "LIFE_LOST",
-        remainingLives: this.lobby.lives,
-        wrongCard: playedCard,
-      });
-    }
+export function useShuriken(lobby: Lobby): number | null {
+  if (lobby.shurikens <= 0) {
+    return null;
   }
 
-  async handleJoinLobby(ws: WebSocket, playerName: string) {
-    const existingAttachment = this.getAttachment(ws);
-    if (existingAttachment) {
-      ws.send(
-        JSON.stringify({
-          type: "JOINED",
-          playerId: existingAttachment.playerId,
-          playerName: existingAttachment.playerName,
-        }),
-      );
-      this.sendLobbyState();
-      return;
-    }
+  const allCards = lobby.players.flatMap((player) => player.hand);
+  const lowestCard = Math.min(...allCards);
 
-    const playerId = crypto.randomUUID();
-    const newPlayer: Player = { id: playerId, name: playerName, hand: [] };
-    this.lobby.players.push(newPlayer);
+  lobby.shurikens -= 1;
+  lobby.discardPile.push(lowestCard);
+  lobby.players.forEach((player) => {
+    player.hand = player.hand.filter((card) => card !== lowestCard);
+  });
 
-    if (!this.lobby.hostPlayerId) {
-      this.lobby.hostPlayerId = playerId;
-    }
+  return lowestCard;
+}
 
-    ws.serializeAttachment({ playerId, playerName } satisfies PlayerAttachment);
-
-
-    ws.send(
-      JSON.stringify({
-        type: "JOINED",
-        playerId,
-        playerName,
-      }),
-    );
-
-    // this.broadcast({
-    //   type: "PLAYER_JOINED",
-    //   data: newPlayer.id,
-    //   playerName: newPlayer.name,
-    // });
-
-    await this.saveLobbyState();
-    this.sendLobbyState();
+export function startGame(lobby: Lobby): boolean {
+  if (lobby.state !== "waiting") {
+    return false;
   }
 
-  handleUseShuriken(ws: WebSocket) {
-    void ws;
-    if (this.lobby.shurikens > 0) {
-      this.lobby.shurikens -= 1;
-      const lowestCard = Math.min(...this.lobby.players.flatMap((p) => p.hand));
-      this.lobby.discardPile.push(lowestCard);
-      this.lobby.players.forEach((p) => {
-        p.hand = p.hand.filter((c) => c !== lowestCard);
-      });
-      this.broadcast({
-        type: "SHURIKEN_USED",
-        remainingShurikens: this.lobby.shurikens,
-        cardRemoved: lowestCard,
-      });
-    }
-  }
+  lobby.state = "playing";
+  lobby.lives = lobby.players.length;
+  lobby.shurikens = 1;
+  lobby.currentLevel = 0;
+  dealNewLevel(lobby);
+  return true;
+}
 
-  handleStartGame(ws: WebSocket) {
-    const playerId = this.getAttachment(ws)?.playerId;
-    if (!playerId || playerId !== this.lobby.hostPlayerId) {
-      ws.send(
-        JSON.stringify({
-          type: "ERROR",
-          message: "Only the lobby creator can start the game.",
-        }),
-      );
-      return;
-    }
+export function dealNewLevel(lobby: Lobby) {
+  lobby.currentLevel += 1;
+  const deck = Array.from({ length: 100 }, (_, i) => i + 1).sort(
+    () => Math.random() - 0.5,
+  );
+  const numPlayers = lobby.players.length;
 
-    if (this.lobby.state === "waiting") {
-      this.lobby.state = "playing";
-      const deck = Array.from({ length: 100 }, (_, i) => i + 1).sort(
-        () => Math.random() - 0.5,
-      );
-      const numPlayers = this.lobby.players.length;
-      this.lobby.players.forEach((player, index) => {
-        player.hand = deck
-          .filter((_, i) => i % numPlayers === index)
-          .slice(0, 3);
-      });
-      this.lobby.lives = 3;
-      this.lobby.shurikens = 2;
-      this.broadcast({
-        type: "GAME_STARTED",
-        players: this.lobby.players.map((p) => ({ id: p.id, name: p.name })),
-      });
-      void this.saveLobbyState();
-      this.sendLobbyState();
-    }
-  }
+  lobby.players.forEach((player, index) => {
+    player.hand = deck
+      .filter((_, i) => i % numPlayers === index)
+      .slice(0, lobby.currentLevel);
+  });
 }

@@ -1,4 +1,4 @@
-import { LobbyServer } from "./lobby.ts";
+import { LobbyServer } from "./lobby-server.ts";
 
 export interface Env {
   LOBBY_SERVER: DurableObjectNamespace<LobbyServer>;
