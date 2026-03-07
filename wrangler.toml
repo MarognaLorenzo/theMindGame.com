@@ -1,4 +1,4 @@
-name = "the-mind-game-worker"
+name = "the-mind-game-online-3-0"
 main = "worker/index.ts"
 compatibility_date = "2026-03-07"
 
