@@ -114,6 +114,12 @@ export class LobbyServer extends DurableObject {
   async handlePlayCard(ws: WebSocket, playedCard: number) {
     void ws;
     const isAccepted = playCard(this.lobby, playedCard);
+    if (!isAccepted) {
+      // check if game is over:
+      if (this.lobby.lives <= 0) {
+        this.lobby.state = "lost";
+      }
+    }
     await this.saveLobbyState();
     this.sendLobbyState();
   }

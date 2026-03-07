@@ -95,7 +95,7 @@ export function useShuriken(lobby: Lobby): number | null {
 }
 
 export function startGame(lobby: Lobby): boolean {
-  if (lobby.state !== "waiting") {
+  if (lobby.state === "playing") {
     return false;
   }
 

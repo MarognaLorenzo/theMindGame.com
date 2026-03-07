@@ -28,11 +28,11 @@ export function GameStageRouter({
   }
 
   if (lobby.state === "won") {
-    return <WonView lobby={lobby} />;
+    return <WonView lobby={lobby} isHost={isHost}/>;
   }
 
   if (lobby.state === "lost") {
-    return <LostView lobby={lobby} />;
+    return <LostView lobby={lobby} isHost={isHost} onStartGame={onStartGame}/>;
   }
 
   return (
