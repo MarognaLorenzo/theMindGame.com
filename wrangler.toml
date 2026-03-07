@@ -1,0 +1,11 @@
+name = "the-mind-game-worker"
+main = "worker/index.ts"
+compatibility_date = "2026-03-07"
+
+[[durable_objects.bindings]]
+name = "LOBBY_SERVER"
+class_name = "LobbyServer"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["LobbyServer"]
