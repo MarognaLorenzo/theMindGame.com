@@ -36,11 +36,16 @@ interface UseShurikenPayload {
   type: "USE_SHURIKEN";
 }
 
+interface ExitGamePayload {
+  type: "EXIT_GAME";
+}
+
 type ClientMessage =
   | JoinPayload
   | StartPayload
   | PlayCardPayload
-  | UseShurikenPayload;
+  | UseShurikenPayload
+  | ExitGamePayload;
 
 export class LobbyServer extends DurableObject {
   private initialized = false;
@@ -172,6 +177,9 @@ export class LobbyServer extends DurableObject {
         break;
       case "USE_SHURIKEN":
         this.handleUseShuriken(ws);
+        break;
+      case "EXIT_GAME":
+        await this.handleExitGame(ws);
         break;
       default:
         console.error("Unknown message type");
@@ -392,6 +400,50 @@ export class LobbyServer extends DurableObject {
     if (lowestCard !== null) {
       this.sendLobbyState();
     }
+  }
+
+  async handleExitGame(ws: WebSocket) {
+    const playerId = readPlayerAttachment(ws)?.playerId;
+    if (!playerId) {
+      return;
+    }
+
+    await this.clearPendingDisconnect(playerId);
+    removePlayer(this.lobby, playerId);
+
+    const resumeTokens = await this.loadResumeTokens();
+    let tokensChanged = false;
+    for (const [token, tokenPlayerId] of Object.entries(resumeTokens)) {
+      if (tokenPlayerId !== playerId) {
+        continue;
+      }
+      delete resumeTokens[token];
+      tokensChanged = true;
+    }
+
+    if (tokensChanged) {
+      await this.saveResumeTokens(resumeTokens);
+    }
+
+    if (this.lobby.state === "playing") {
+      this.lobby.state = "waiting";
+      this.lobby.discardPile = [];
+      this.lobby.lives = 0;
+      this.lobby.shurikens = 0;
+      this.lobby.currentLevel = 0;
+      this.lobby.winningLevel = 0;
+      this.lobby.players.forEach((player) => {
+        player.hand = [];
+      });
+
+      this.broadcast({
+        type: "GAME_ABORTED",
+        message: "A player exited the game. Returning everyone to home.",
+      });
+    }
+
+    await this.saveLobbyState();
+    this.sendLobbyState();
   }
 
   handleStartGame(ws: WebSocket) {

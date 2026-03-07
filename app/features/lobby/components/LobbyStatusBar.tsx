@@ -10,9 +10,10 @@ export function LobbyStatusBar({
   workerBaseUrl,
 }: LobbyStatusBarProps) {
   return (
-    <div className="mt-6 space-y-1 text-sm">
-      <p className="text-slate-300">Status: {status}</p>
-      {error ? <p className="text-rose-400">Error: {error}</p> : null}
+    <div className="mt-6 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-2)] p-3 text-sm">
+      <p className="text-[var(--text-muted)]">Status: {status}</p>
+      <p className="mt-1 break-all text-xs text-[var(--text-muted)]/80">Endpoint: {workerBaseUrl}</p>
+      {error ? <p className="mt-1 text-sm text-[#ff8f8f]">Error: {error}</p> : null}
     </div>
   );
 }

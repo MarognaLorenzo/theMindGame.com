@@ -13,6 +13,7 @@ export interface SocketLobbyState {
   lives: number;
   shurikens: number;
   currentLevel: number;
+  winningLevel: number;
 }
 
 export interface SocketJoinedMessage {
@@ -32,7 +33,13 @@ export interface SocketErrorMessage {
   message: string;
 }
 
+export interface SocketGameAbortedMessage {
+  type: "GAME_ABORTED";
+  message: string;
+}
+
 export type SocketMessage =
   | SocketJoinedMessage
   | SocketLobbyStateMessage
-  | SocketErrorMessage;
+  | SocketErrorMessage
+  | SocketGameAbortedMessage;

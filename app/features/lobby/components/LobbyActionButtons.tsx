@@ -1,34 +1,26 @@
 interface LobbyActionButtonsProps {
   onCreateLobby: () => void;
   onJoinLobby: () => void;
-  onDisconnect: () => void;
 }
 
 export function LobbyActionButtons({
   onCreateLobby,
   onJoinLobby,
-  onDisconnect,
 }: LobbyActionButtonsProps) {
   return (
-    <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+    <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
       <button
         onClick={onCreateLobby}
-        className="rounded-lg bg-cyan-500 px-4 py-2 font-semibold text-slate-950 transition hover:bg-cyan-400"
+        className="min-h-11 w-full rounded-xl bg-[var(--accent)] px-4 py-2.5 font-semibold text-[#0a1712] transition hover:brightness-110 sm:w-auto"
       >
         Create Lobby
       </button>
       <button
         onClick={onJoinLobby}
-        className="rounded-lg border border-cyan-400/60 px-4 py-2 font-semibold text-cyan-300 transition hover:bg-cyan-400/10"
+        className="min-h-11 w-full rounded-xl border border-[var(--accent)] px-4 py-2.5 font-semibold text-[var(--accent)] transition hover:bg-[var(--accent-soft)] sm:w-auto"
       >
         Join Lobby
       </button>
-      {/* <button
-        onClick={onDisconnect}
-        className="rounded-lg border border-slate-600 px-4 py-2 font-semibold text-slate-300 transition hover:bg-slate-800"
-      >
-        Disconnect
-      </button> */}
     </div>
   );
 }

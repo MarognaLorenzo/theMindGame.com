@@ -14,22 +14,26 @@ export function LobbySetupForm({
   return (
     <div className="mt-8 space-y-4">
       <label className="block">
-        <span className="mb-1 block text-sm text-slate-300">Name</span>
+        <span className="mb-1 block text-sm text-[var(--text-muted)]">Name</span>
         <input
           value={name}
           onChange={(e) => onNameChange(e.target.value)}
           placeholder="e.g. Lorenzo"
-          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 outline-none ring-cyan-400 transition focus:ring-2"
+          autoComplete="nickname"
+          className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-2)] px-3 py-3 text-base text-[var(--text-strong)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]"
         />
       </label>
 
       <label className="block">
-        <span className="mb-1 block text-sm text-slate-300">Lobby ID</span>
+        <span className="mb-1 block text-sm text-[var(--text-muted)]">Lobby ID</span>
         <input
           value={lobbyId}
           onChange={(e) => onLobbyIdChange(e.target.value)}
           placeholder="Paste lobby ID to join"
-          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 outline-none ring-cyan-400 transition focus:ring-2"
+          autoCapitalize="characters"
+          autoCorrect="off"
+          spellCheck={false}
+          className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-2)] px-3 py-3 font-mono text-base text-[var(--text-strong)] outline-none transition placeholder:font-sans placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]"
         />
       </label>
     </div>

@@ -65,6 +65,7 @@ export function playCard(lobby: Lobby, playedCard: number): boolean {
 
     // check for level completion
     if (lobby.players.every((player) => player.hand.length === 0)) {
+      lobby.discardPile = [];
       if (lobby.currentLevel >= lobby.winningLevel) {
         lobby.state = "won";
       } else {

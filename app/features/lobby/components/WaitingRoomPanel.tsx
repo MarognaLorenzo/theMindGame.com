@@ -16,26 +16,26 @@ export function WaitingRoomPanel({
   onStartGame,
 }: WaitingRoomPanelProps) {
   return (
-    <section className="mt-8 rounded-xl border border-cyan-300/20 bg-slate-950/70 p-5">
-      <div className="flex items-center justify-between">
+    <section className="mt-8 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-2)] p-5 sm:p-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-cyan-400/80">
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-muted)]">
             Lobby Code
           </p>
-          <p className="text-3xl font-black tracking-[0.25em] text-cyan-200">
+          <p className="font-mono text-2xl font-bold tracking-[0.18em] text-[var(--text-strong)] sm:text-3xl sm:tracking-[0.25em]">
             {lobbyId || "------"}
           </p>
         </div>
-        <div className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-300">
+        <div className="w-fit rounded-full border border-[var(--border-subtle)] bg-[var(--surface-1)] px-3 py-1 text-xs text-[var(--text-muted)]">
           State: {lobby.state}
         </div>
       </div>
 
       <div className="mt-5">
-        <h2 className="text-sm font-semibold text-cyan-300">Players In Room</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">Players In Room</h2>
         <ul className="mt-3 space-y-2">
           {lobby.players.length === 0 ? (
-            <li className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-500">
+            <li className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-1)] px-3 py-2 text-sm text-[var(--text-muted)]">
               Waiting for players...
             </li>
           ) : (
@@ -46,14 +46,14 @@ export function WaitingRoomPanel({
               return (
                 <li
                   key={player.id}
-                  className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-900 px-3 py-2"
+                  className="flex items-center justify-between rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-1)] px-3 py-2"
                 >
-                  <span className="text-sm text-slate-200">
+                  <span className="pr-2 text-sm text-[var(--text-strong)]">
                     {player.name}
                     {isMe ? " (you)" : ""}
                   </span>
                   {isPlayerHost ? (
-                    <span className="rounded bg-cyan-500/20 px-2 py-0.5 text-xs font-semibold text-cyan-200">
+                    <span className="rounded bg-[var(--accent-soft)] px-2 py-0.5 text-xs font-semibold text-[var(--accent)]">
                       Host
                     </span>
                   ) : null}
@@ -67,7 +67,7 @@ export function WaitingRoomPanel({
       {isHost && lobby.players.length > 1 ? (
         <button
           onClick={onStartGame}
-          className="mt-5 w-full rounded-lg bg-emerald-400 px-4 py-2 font-bold text-emerald-950 transition hover:bg-emerald-300"
+          className="mt-5 min-h-11 w-full rounded-xl bg-[var(--accent)] px-4 py-2.5 font-semibold text-[#0a1712] transition hover:brightness-110"
         >
           Start Game
         </button>

@@ -8,15 +8,14 @@ interface WonViewProps {
 
 export function WonView({ lobby, isHost, onStartGame }: WonViewProps) {
   return (
-    <section className="mt-8 rounded-xl border border-amber-300/30 bg-amber-950/20 p-5">
-      <h2 className="text-lg font-bold text-amber-200">Victory</h2>
-      <p className="mt-2 text-sm text-amber-100/90">
-        Team completed level {lobby.currentLevel}. You can add recap components
-        here (best moves, timeline, stats, rematch controls).
+    <section className="mt-8 rounded-2xl border border-[#f1ba6a55] bg-[#3e2b1422] p-5 sm:p-6">
+      <h2 className="text-lg font-semibold text-[#f8d7a3] sm:text-xl">Victory</h2>
+      <p className="mt-2 text-sm text-[#f2c98f]">
+        Team completed level {lobby.currentLevel}. Clean run.
       </p>
       {isHost && onStartGame && (
         <button
-          className="mt-4 rounded bg-amber-300/20 px-4 py-2 text-sm text-amber-200 hover:bg-amber-300/30"
+          className="mt-4 min-h-11 w-full rounded-xl border border-[#f1ba6a88] bg-[#f1ba6a22] px-4 py-2.5 text-sm font-medium text-[#ffdcae] transition hover:bg-[#f1ba6a33] sm:w-auto"
           onClick={onStartGame}
         >
           Start New Game

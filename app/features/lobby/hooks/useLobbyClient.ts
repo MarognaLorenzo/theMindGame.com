@@ -255,6 +255,12 @@ export function useLobbyClient() {
             clearSession();
           }
         }
+
+        if (data.type === "GAME_ABORTED") {
+          setError(data.message);
+          disconnectSocket({ clearStoredSession: true, allowReconnect: false });
+          setStatus("Ready");
+        }
       } catch {
         // Keep non-JSON payloads in the raw log only.
       }
@@ -351,6 +357,17 @@ export function useLobbyClient() {
     appendMessage("Sent: USE_SHURIKEN");
   }
 
+  function exitGame() {
+    if (!validConnection()) {
+      disconnectSocket({ clearStoredSession: true, allowReconnect: false });
+      return;
+    }
+
+    wsRef.current?.send(JSON.stringify({ type: "EXIT_GAME" }));
+    appendMessage("Sent: EXIT_GAME");
+    disconnectSocket({ clearStoredSession: true, allowReconnect: false });
+  }
+
   useEffect(() => {
     const session = loadStoredSession();
     if (!session) {
@@ -395,5 +412,6 @@ export function useLobbyClient() {
     clearMessages,
     onCardPlay,
     onShurikenUse,
+    exitGame,
   };
 }
