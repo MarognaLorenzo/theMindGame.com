@@ -187,6 +187,12 @@ export function useLobbyClient() {
     appendMessage(`Sent: PLAY_CARD ${card}`);
   }
 
+  function onShurikenUse() {
+    if (!validConnection()) return;
+    wsRef?.current?.send(JSON.stringify({ type: "USE_SHURIKEN" }));
+    appendMessage("Sent: USE_SHURIKEN");
+  }
+
   useEffect(() => {
     return () => {
       disconnectSocket();
@@ -214,5 +220,6 @@ export function useLobbyClient() {
     startGame,
     clearMessages,
     onCardPlay,
+    onShurikenUse,
   };
 }

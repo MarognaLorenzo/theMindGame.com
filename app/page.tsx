@@ -27,6 +27,7 @@ export default function Home() {
     startGame,
     clearMessages,
     onCardPlay,
+    onShurikenUse,
   } = useLobbyClient();
 
   return (
@@ -67,6 +68,7 @@ export default function Home() {
               isHost={isHost}
               onStartGame={startGame}
               onCardPlay={onCardPlay}
+              onShurikenUse={onShurikenUse}
             />
           ) : null
         ) : null}

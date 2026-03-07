@@ -165,11 +165,7 @@ export class LobbyServer extends DurableObject {
     void ws;
     const lowestCard = useShuriken(this.lobby);
     if (lowestCard !== null) {
-      this.broadcast({
-        type: "SHURIKEN_USED",
-        remainingShurikens: this.lobby.shurikens,
-        cardRemoved: lowestCard,
-      });
+      this.sendLobbyState();
     }
   }
 

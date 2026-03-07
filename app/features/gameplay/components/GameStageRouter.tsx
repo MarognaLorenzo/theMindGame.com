@@ -10,7 +10,8 @@ interface GameStageRouterProps {
   myPlayerId: string | null;
   isHost: boolean;
   onStartGame: () => void;
-  onCardPlay: (card: string) => void;
+  onCardPlay: (card: number) => void;
+  onShurikenUse: () => void;
 }
 
 export function GameStageRouter({
@@ -20,9 +21,10 @@ export function GameStageRouter({
   isHost,
   onStartGame,
   onCardPlay,
+  onShurikenUse,
 }: GameStageRouterProps) {
   if (lobby.state === "playing") {
-    return <PlayingView lobby={lobby} myPlayerId={myPlayerId} onCardPlay={onCardPlay} />;
+    return <PlayingView lobby={lobby} myPlayerId={myPlayerId} onCardPlay={onCardPlay} onShurikenUse={onShurikenUse} />;
   }
 
   if (lobby.state === "won") {

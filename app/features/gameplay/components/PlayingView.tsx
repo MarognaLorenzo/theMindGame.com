@@ -4,9 +4,10 @@ interface PlayingViewProps {
   lobby: SocketLobbyState;
   myPlayerId: string | null;
   onCardPlay: (card: number) => void;
+  onShurikenUse: () => void;
 }
 
-export function PlayingView({ lobby, myPlayerId, onCardPlay }: PlayingViewProps) {
+export function PlayingView({ lobby, myPlayerId, onCardPlay, onShurikenUse }: PlayingViewProps) {
   return (
     <section className="mt-8 rounded-xl border border-emerald-300/30 bg-emerald-950/20 p-5">
       <h2 className="text-lg font-bold text-emerald-200">Game In Progress</h2>
@@ -53,6 +54,12 @@ export function PlayingView({ lobby, myPlayerId, onCardPlay }: PlayingViewProps)
           className="mt-6 rounded border border-emerald-400 px-3 py-2 text-sm text-emerald-200 hover:bg-emerald-500/20"
         >
           Play Lowest Card
+        </button>
+        <button
+          onClick={onShurikenUse}
+          className="mt-6 rounded border border-emerald-400 px-3 py-2 text-sm text-emerald-200 hover:bg-emerald-500/20"
+        >
+          Use Shuriken
         </button>
     </section>
   );
