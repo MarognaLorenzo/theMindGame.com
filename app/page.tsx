@@ -39,9 +39,12 @@ export default function Home() {
         <h1 className="text-3xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-4xl">
           The Mind Online
         </h1>
+
+        {lobbyId ? 
         <p className="mt-2 text-sm text-[var(--text-muted)]">
           Lobby code: {lobbyId}
         </p>
+        : null}
         <p className="mt-2 text-sm text-[var(--text-muted)]">
           {isPlaying
             ? "Focus mode on. Play cards directly from your hand."

@@ -18,7 +18,7 @@ export function LobbySetupForm({
         <input
           value={name}
           onChange={(e) => onNameChange(e.target.value)}
-          placeholder="e.g. Lorenzo"
+          // placeholder="e.g. Lorenzo"
           autoComplete="nickname"
           className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-2)] px-3 py-3 text-base text-[var(--text-strong)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]"
         />
