@@ -376,6 +376,29 @@ export function useLobbyClient() {
     disconnectSocket({ clearStoredSession: true, allowReconnect: false });
   }
 
+  function leaveLobby() {
+    if (!validConnection()) {
+      disconnectSocket({ clearStoredSession: true, allowReconnect: false });
+      return;
+    }
+
+    // Leave is server-authoritative: send LEAVE_LOBBY and let server close the socket.
+    clearReconnectTimer();
+    allowAutoReconnectRef.current = false;
+    clearSession();
+
+    wsRef.current?.send(JSON.stringify({ type: "LEAVE_LOBBY" }));
+    appendMessage("Sent: LEAVE_LOBBY");
+    setStatus("Leaving lobby...");
+
+    // Fallback: if close event does not arrive, force local cleanup.
+    window.setTimeout(() => {
+      if (wsRef.current) {
+        disconnectSocket({ clearStoredSession: true, allowReconnect: false });
+      }
+    }, 1200);
+  }
+
   useEffect(() => {
     const session = loadStoredSession();
     if (!session) {
@@ -421,5 +444,6 @@ export function useLobbyClient() {
     onCardPlay,
     onShurikenUse,
     exitGame,
+    leaveLobby,
   };
 }

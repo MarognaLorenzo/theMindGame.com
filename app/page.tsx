@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { GameStageRouter } from "./features/gameplay/components/GameStageRouter";
 import { LobbyActionButtons } from "./features/lobby/components/LobbyActionButtons";
 import { LobbySetupForm } from "./features/lobby/components/LobbySetupForm";
@@ -28,6 +29,7 @@ export default function Home() {
   } = useLobbyClient();
 
   const isPlaying = lobby?.state === "playing";
+  const [lobbyFlow, setLobbyFlow] = useState<"create" | "join">("create");
   const showLobbyControls = !isPlaying;
   const mainClasses = isPlaying
     ? "mx-auto w-full max-w-4xl p-0"
@@ -56,11 +58,14 @@ export default function Home() {
             <LobbySetupForm
               name={name}
               lobbyId={lobbyId}
+              showLobbyIdField={lobbyFlow === "join"}
               onNameChange={setName}
               onLobbyIdChange={setLobbyId}
             />
 
             <LobbyActionButtons
+              flow={lobbyFlow}
+              onFlowChange={setLobbyFlow}
               onCreateLobby={createLobby}
               onJoinLobby={joinLobby}
             />
@@ -70,6 +75,7 @@ export default function Home() {
               error={error}
               workerBaseUrl={workerBaseUrl}
             />
+            {error ? (<p className="mt-1 text-sm text-[#ff8f8f]">Error: {error}</p>) : null}
           </>
         ) : null}
 
