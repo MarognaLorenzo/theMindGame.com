@@ -8,8 +8,10 @@ interface LostViewProps {
 
 export function LostView({ lobby, onStartGame, isHost }: LostViewProps) {
   return (
-    <section className="mt-8 rounded-2xl border border-[#f08f8f55] bg-[#3f171d22] p-5 sm:p-6">
-      <h2 className="text-lg font-semibold text-[#ffc4ca] sm:text-xl">Defeat</h2>
+    <section className="game-result-enter game-result-lost relative mt-8 overflow-hidden rounded-2xl border border-[#f08f8f55] bg-[#3f171d22] p-5 sm:p-6">
+      <span className="result-particle result-particle-a" aria-hidden="true" />
+      <span className="result-particle result-particle-b" aria-hidden="true" />
+      <h2 className="game-result-title-pop text-lg font-semibold text-[#ffc4ca] sm:text-xl">Defeat</h2>
       <p className="mt-2 text-sm text-[#ffb2bc]">
         Run ended on level {lobby.currentLevel}. Regroup and try again.
       </p>

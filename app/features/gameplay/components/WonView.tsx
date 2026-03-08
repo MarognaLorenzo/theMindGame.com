@@ -8,8 +8,10 @@ interface WonViewProps {
 
 export function WonView({ lobby, isHost, onStartGame }: WonViewProps) {
   return (
-    <section className="mt-8 rounded-2xl border border-[#f1ba6a55] bg-[#3e2b1422] p-5 sm:p-6">
-      <h2 className="text-lg font-semibold text-[#f8d7a3] sm:text-xl">Victory</h2>
+    <section className="game-result-enter game-result-win relative mt-8 overflow-hidden rounded-2xl border border-[#f1ba6a55] bg-[#3e2b1422] p-5 sm:p-6">
+      <span className="result-particle result-particle-a" aria-hidden="true" />
+      <span className="result-particle result-particle-b" aria-hidden="true" />
+      <h2 className="game-result-title-pop text-lg font-semibold text-[#f8d7a3] sm:text-xl">Victory</h2>
       <p className="mt-2 text-sm text-[#f2c98f]">
         Team completed level {lobby.currentLevel}. Clean run.
       </p>

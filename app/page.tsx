@@ -31,6 +31,7 @@ export default function Home() {
   const isPlaying = lobby?.state === "playing";
   const [lobbyFlow, setLobbyFlow] = useState<"create" | "join">("create");
   const showLobbyControls = !isPlaying;
+  const shouldRenderGameStage = Boolean(lobby);
   const mainClasses = isPlaying
     ? "mx-auto w-full max-w-4xl p-0"
     : "mx-auto w-full max-w-3xl rounded-3xl border border-[var(--border-subtle)] bg-[var(--surface-1)] p-6 shadow-[0_18px_80px_rgba(6,10,14,0.65)] backdrop-blur md:p-8";
@@ -79,8 +80,13 @@ export default function Home() {
           </>
         ) : null}
 
-        {isConnected ? (
-          lobby ? (
+        {shouldRenderGameStage && lobby ? (
+          <>
+            {!isConnected && (
+              <p className="mt-4 text-xs tracking-[0.06em] text-[#f3cf96]">
+                Connection lost. Reconnecting...
+              </p>
+            )}
             <GameStageRouter
               lobbyId={lobbyId}
               lobby={lobby}
@@ -91,7 +97,7 @@ export default function Home() {
               onCardPlay={onCardPlay}
               onShurikenUse={onShurikenUse}
             />
-          ) : null
+          </>
         ) : null}
       </main>
     </div>

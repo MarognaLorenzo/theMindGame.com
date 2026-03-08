@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import type { SocketLobbyState } from "../../lobby/types";
 
 interface PlayingViewProps {
@@ -6,6 +7,16 @@ interface PlayingViewProps {
   onExitGame: () => void;
   onCardPlay: (card: number) => void;
   onShurikenUse: () => void;
+}
+
+interface LevelCompletionAnnouncement {
+  completedLevel: number;
+  gainedLives: number;
+  gainedShurikens: number;
+}
+
+interface LifeLossAnnouncement {
+  lostLives: number;
 }
 
 function HeartIcon() {
@@ -41,13 +52,118 @@ export function PlayingView({
   onCardPlay,
   onShurikenUse,
 }: PlayingViewProps) {
+  const previousLivesRef = useRef(lobby.lives);
+  const previousShurikensRef = useRef(lobby.shurikens);
+  const previousLevelRef = useRef(lobby.currentLevel);
+  const levelOverlayTimeoutRef = useRef<number | undefined>(undefined);
+  const lifeLossOverlayTimeoutRef = useRef<number | undefined>(undefined);
+  const [lifeGainTick, setLifeGainTick] = useState(0);
+  const [lifeLossTick, setLifeLossTick] = useState(0);
+  const [shurikenGainTick, setShurikenGainTick] = useState(0);
+  const [levelCompleteTick, setLevelCompleteTick] = useState(0);
+  const [lifeLossOverlayTick, setLifeLossOverlayTick] = useState(0);
+  const [completedLevelAnnouncement, setCompletedLevelAnnouncement] = useState<LevelCompletionAnnouncement | null>(null);
+  const [lifeLossAnnouncement, setLifeLossAnnouncement] = useState<LifeLossAnnouncement | null>(null);
+  const [lastLifeEvent, setLastLifeEvent] = useState<"gain" | "loss" | null>(null);
+
+  useEffect(() => {
+    let timeoutId: number | undefined;
+    if (lobby.currentLevel > previousLevelRef.current) {
+      const completedLevel = Math.max(1, lobby.currentLevel - 1);
+      const gainedLives = Math.max(0, lobby.lives - previousLivesRef.current);
+      const gainedShurikens = Math.max(0, lobby.shurikens - previousShurikensRef.current);
+
+      timeoutId = window.setTimeout(() => {
+        setLevelCompleteTick((tick) => tick + 1);
+        setCompletedLevelAnnouncement({
+          completedLevel,
+          gainedLives,
+          gainedShurikens,
+        });
+      }, 0);
+
+      if (levelOverlayTimeoutRef.current !== undefined) {
+        window.clearTimeout(levelOverlayTimeoutRef.current);
+      }
+
+      levelOverlayTimeoutRef.current = window.setTimeout(() => {
+        setCompletedLevelAnnouncement(null);
+      }, 2500);
+    }
+
+    previousLevelRef.current = lobby.currentLevel;
+    return () => {
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [lobby.currentLevel, lobby.lives, lobby.shurikens]);
+
+  useEffect(() => {
+    let timeoutId: number | undefined;
+    if (lobby.lives > previousLivesRef.current) {
+      timeoutId = window.setTimeout(() => {
+        setLifeGainTick((tick) => tick + 1);
+        setLastLifeEvent("gain");
+      }, 0);
+    } else if (lobby.lives < previousLivesRef.current) {
+      const lostLives = Math.max(1, previousLivesRef.current - lobby.lives);
+      timeoutId = window.setTimeout(() => {
+        setLifeLossTick((tick) => tick + 1);
+        setLastLifeEvent("loss");
+        setLifeLossOverlayTick((tick) => tick + 1);
+        setLifeLossAnnouncement({ lostLives });
+      }, 0);
+
+      if (lifeLossOverlayTimeoutRef.current !== undefined) {
+        window.clearTimeout(lifeLossOverlayTimeoutRef.current);
+      }
+
+      lifeLossOverlayTimeoutRef.current = window.setTimeout(() => {
+        setLifeLossAnnouncement(null);
+      }, 2500);
+    }
+    previousLivesRef.current = lobby.lives;
+    return () => {
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [lobby.lives]);
+
+  useEffect(() => {
+    let timeoutId: number | undefined;
+    if (lobby.shurikens > previousShurikensRef.current) {
+      timeoutId = window.setTimeout(() => {
+        setShurikenGainTick((tick) => tick + 1);
+      }, 0);
+    }
+    previousShurikensRef.current = lobby.shurikens;
+    return () => {
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [lobby.shurikens]);
+
+  useEffect(() => {
+    return () => {
+      if (levelOverlayTimeoutRef.current !== undefined) {
+        window.clearTimeout(levelOverlayTimeoutRef.current);
+      }
+      if (lifeLossOverlayTimeoutRef.current !== undefined) {
+        window.clearTimeout(lifeLossOverlayTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const myPlayer = lobby.players.find((player) => player.id === myPlayerId);
   const otherPlayers = lobby.players.filter((player) => player.id !== myPlayerId);
   const pilePreview = lobby.discardPile.slice(-5);
   const winningLevel = lobby.winningLevel > 0 ? lobby.winningLevel : "?";
 
   return (
-    <section className="mx-auto mt-8 flex min-h-[calc(100vh-13rem)] w-full max-w-4xl flex-col">
+    <section className="relative mx-auto mt-8 flex min-h-[calc(100vh-13rem)] w-full max-w-4xl flex-col">
       <header className="flex flex-wrap items-center gap-x-6 gap-y-3">
         <div className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)]">
           <span className="uppercase tracking-[0.14em]">Level</span>
@@ -56,20 +172,54 @@ export function PlayingView({
           </span>
         </div>
 
-        <div className="inline-flex items-center gap-1.5 text-[#ff8f9e]" aria-label={`Lives: ${lobby.lives}`}>
+        <div
+          key={`lives-${lifeGainTick}-${lifeLossTick}`}
+          className={`relative inline-flex items-center gap-1.5 text-[#ff8f9e] ${
+            lastLifeEvent === "gain" && lifeGainTick > 0 ? "life-meter-gain" : ""
+          } ${lastLifeEvent === "loss" && lifeLossTick > 0 ? "life-meter-loss" : ""}`}
+          aria-label={`Lives: ${lobby.lives}`}
+        >
           {Array.from({ length: Math.max(0, lobby.lives) }).map((_, index) => (
-            <span key={`life-${index}`}>
+            <span
+              key={`life-${index}`}
+              className={`${
+                lastLifeEvent === "gain" && lifeGainTick > 0
+                  ? "life-icon-pop"
+                  : lastLifeEvent === "loss" && lifeLossTick > 0
+                    ? "life-icon-hit"
+                    : ""
+              }`}
+            >
               <HeartIcon />
             </span>
           ))}
+          {lastLifeEvent === "gain" && lifeGainTick > 0 && (
+            <span key={`life-gain-${lifeGainTick}`} className="life-gain-label" aria-hidden="true">
+              +1
+            </span>
+          )}
+          {lastLifeEvent === "loss" && lifeLossTick > 0 && (
+            <span key={`life-loss-${lifeLossTick}`} className="life-loss-label" aria-hidden="true">
+              -1
+            </span>
+          )}
         </div>
 
-        <div className="inline-flex items-center gap-2 text-[var(--accent)]" aria-label={`Shurikens: ${lobby.shurikens}`}>
+        <div
+          key={`shurikens-${shurikenGainTick}`}
+          className={`relative inline-flex items-center gap-2 text-[var(--accent)] ${shurikenGainTick > 0 ? "shuriken-meter-gain" : ""}`}
+          aria-label={`Shurikens: ${lobby.shurikens}`}
+        >
           {Array.from({ length: Math.max(0, lobby.shurikens) }).map((_, index) => (
-            <span key={`shuriken-${index}`}>
+            <span key={`shuriken-${index}`} className={shurikenGainTick > 0 ? "shuriken-icon-spin" : ""}>
               <ShurikenIcon />
             </span>
           ))}
+          {shurikenGainTick > 0 && (
+            <span key={`shuriken-gain-${shurikenGainTick}`} className="shuriken-gain-label" aria-hidden="true">
+              +1
+            </span>
+          )}
         </div>
 
         <div className="ml-auto inline-flex items-center gap-3">
@@ -106,7 +256,55 @@ export function PlayingView({
         )}
       </ul>
 
-      <div className="mt-8 flex min-h-44 items-center justify-center">
+      <div className="relative mt-8 flex min-h-44 items-center justify-center">
+        {completedLevelAnnouncement !== null && (
+          <div
+            key={`level-overlay-${levelCompleteTick}`}
+            className="discard-announcement-overlay level-complete-overlay"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            <div className="level-complete-card">
+              <p className="level-complete-title">LEVEL {completedLevelAnnouncement.completedLevel} COMPLETE!</p>
+              <p className="level-complete-subtitle">Incoming Level {lobby.currentLevel}</p>
+              <div className="level-complete-rewards">
+                {completedLevelAnnouncement.gainedLives > 0 && (
+                  <span
+                    className={`level-reward-pill ${
+                      completedLevelAnnouncement.gainedLives > 0 ? "level-reward-pill-life" : "level-reward-pill-muted"
+                    }`}
+                  >
+                    Lives +{completedLevelAnnouncement.gainedLives}
+                  </span>
+                )}
+                {completedLevelAnnouncement.gainedShurikens > 0 && (
+                  <span
+                    className={`level-reward-pill ${
+                      completedLevelAnnouncement.gainedShurikens > 0 ? "level-reward-pill-shuriken" : "level-reward-pill-muted"
+                    }`}
+                  >
+                    Shurikens +{completedLevelAnnouncement.gainedShurikens}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {lifeLossAnnouncement !== null && (
+          <div
+            key={`life-loss-overlay-${lifeLossOverlayTick}`}
+            className="discard-announcement-overlay life-loss-overlay"
+            aria-live="assertive"
+            aria-atomic="true"
+          >
+            <div className="life-loss-card">
+              <p className="life-loss-title">Wrong Card Played!</p>
+              <p className="life-loss-subtitle">Team loses {lifeLossAnnouncement.lostLives} life</p>
+            </div>
+          </div>
+        )}
+
         {pilePreview.length > 0 ? (
           <div className="relative h-40 w-full max-w-sm">
             {pilePreview.map((card, index) => {
