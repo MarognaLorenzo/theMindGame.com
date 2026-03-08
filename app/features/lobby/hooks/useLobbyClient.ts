@@ -93,6 +93,7 @@ interface ConnectOptions {
 interface DisconnectOptions {
   clearStoredSession?: boolean;
   allowReconnect?: boolean;
+  clearLobbyState?: boolean;
 }
 
 export function useLobbyClient() {
@@ -141,6 +142,7 @@ export function useLobbyClient() {
   function disconnectSocket(options?: DisconnectOptions) {
     const clearStoredSession = options?.clearStoredSession ?? true;
     const allowReconnect = options?.allowReconnect ?? false;
+    const clearLobbyState = options?.clearLobbyState ?? true;
 
     clearReconnectTimer();
     allowAutoReconnectRef.current = allowReconnect;
@@ -156,7 +158,9 @@ export function useLobbyClient() {
 
     setIsConnected(false);
     setMyPlayerId(null);
-    setLobby(null);
+    if (clearLobbyState) {
+      setLobby(null);
+    }
   }
 
   function scheduleReconnect() {
@@ -192,7 +196,11 @@ export function useLobbyClient() {
       return;
     }
 
-    disconnectSocket({ clearStoredSession: false, allowReconnect: false });
+    disconnectSocket({
+      clearStoredSession: false,
+      allowReconnect: false,
+      clearLobbyState: false,
+    });
     allowAutoReconnectRef.current = true;
 
     const url = new URL(`${wsBaseUrl}/api/join`);
