@@ -79,10 +79,15 @@ export function playCard(lobby: Lobby, playedCard: number): boolean {
   }
 
   lobby.lives -= 1;
-  const lowerCards = allCards.filter((card) => card <= playedCard);
+  let lowerCards = allCards.filter((card) => card <= playedCard);
+  if (lowerCards.length === allCards.length) {
+    // Don't consider the played card if it would be the last one to be played to complete the level. 
+    // This makes it easier to handle the event of level completion without overlapping two animations (the one for playing the wrong card and the one for completing the level).
+    lowerCards = lowerCards.filter((card) => card !== playedCard);
+  }
   lobby.discardPile.push(...lowerCards);
   lobby.players.forEach((player) => {
-    player.hand = player.hand.filter((card) => card > playedCard);
+    player.hand = player.hand.filter((card) => !lowerCards.includes(card));
   });
   return false;
 }
@@ -91,21 +96,32 @@ export function useShuriken(lobby: Lobby): boolean {
   if (lobby.shurikens <= 0) {
     return false;
   }
-  const cardsToAdd = [];
-  for (const player of lobby.players) {
-    if (player.hand.length > 0) {
-      const lowestCard = Math.min(...player.hand);
-      cardsToAdd.push(lowestCard);
-      player.hand = player.hand.filter((card) => card !== lowestCard);
+  const cardsToAdd: number[] = [];
+  if (lobby.players.some((player) => player.hand.length > 1)) {
+
+    for (const player of lobby.players) {
+      if (player.hand.length > 0) {
+        const lowestCard = Math.min(...player.hand);
+        cardsToAdd.push(lowestCard);
+      }
     }
-  }
+  } else {
+    const maxCard = Math.max(...lobby.players.flatMap((player) => player.hand));
+    for (const player of lobby.players) {
+      if (!player.hand.includes(maxCard)) {
+        cardsToAdd.push(...player.hand)
+      }
+    }
+  } 
   if (cardsToAdd.length === 0) {
     return false;
   }
+  
+  for (const player of lobby.players) {
+    player.hand = player.hand.filter((card) => !cardsToAdd.includes(card));
+  }
   lobby.shurikens -= 1;
   lobby.discardPile.push(...cardsToAdd);
-
-
   return true;
 }
 
