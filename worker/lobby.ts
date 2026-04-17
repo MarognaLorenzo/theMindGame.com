@@ -79,24 +79,34 @@ export function playCard(lobby: Lobby, playedCard: number): boolean {
   }
 
   lobby.lives -= 1;
+  const lowerCards = allCards.filter((card) => card <= playedCard);
+  lobby.discardPile.push(...lowerCards);
+  lobby.players.forEach((player) => {
+    player.hand = player.hand.filter((card) => card > playedCard);
+  });
   return false;
 }
 
-export function useShuriken(lobby: Lobby): number | null {
+export function useShuriken(lobby: Lobby): boolean {
   if (lobby.shurikens <= 0) {
-    return null;
+    return false;
   }
-
-  const allCards = lobby.players.flatMap((player) => player.hand);
-  const lowestCard = Math.min(...allCards);
-
+  const cardsToAdd = [];
+  for (const player of lobby.players) {
+    if (player.hand.length > 0) {
+      const lowestCard = Math.min(...player.hand);
+      cardsToAdd.push(lowestCard);
+      player.hand = player.hand.filter((card) => card !== lowestCard);
+    }
+  }
+  if (cardsToAdd.length === 0) {
+    return false;
+  }
   lobby.shurikens -= 1;
-  lobby.discardPile.push(lowestCard);
-  lobby.players.forEach((player) => {
-    player.hand = player.hand.filter((card) => card !== lowestCard);
-  });
+  lobby.discardPile.push(...cardsToAdd);
 
-  return lowestCard;
+
+  return true;
 }
 
 export function startGame(lobby: Lobby): boolean {
@@ -105,9 +115,10 @@ export function startGame(lobby: Lobby): boolean {
   }
 
   lobby.state = "playing";
-  lobby.lives = lobby.players.length;
+  lobby.lives = lobby.players.length <= 4 ? lobby.players.length : 4;
   lobby.shurikens = 1;
   lobby.currentLevel = 1;
+  lobby.discardPile = [];
   switch (lobby.players.length) {
     case 2: lobby.winningLevel = 12; break;
     case 3: lobby.winningLevel = 10; break;

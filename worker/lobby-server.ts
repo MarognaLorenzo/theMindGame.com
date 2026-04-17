@@ -396,8 +396,8 @@ export class LobbyServer extends DurableObject {
 
   async handleUseShuriken(ws: WebSocket) {
     void ws;
-    const lowestCard = spendShuriken(this.lobby);
-    if (lowestCard !== null) {
+    const success = spendShuriken(this.lobby);
+    if (success) {
       this.sendLobbyState();
     }
   }
