@@ -19,4 +19,4 @@ tag = "v2"
 new_sqlite_classes = ["LobbyRegistry"]
 
 [vars]
-ALLOWED_ORIGINS = "https://themindgameonline3-0-pages.pages.dev,http://localhost:3000"
+ALLOWED_ORIGINS = "https://themindgameonline3-0-pages.pages.dev,http://localhost:3000,https://the-mind-game.com"
