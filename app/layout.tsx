@@ -16,6 +16,10 @@ const spaceMono = Space_Mono({
 export const metadata: Metadata = {
   title: "The Mind Online",
   description: "Play The Mind online with a focused multiplayer lobby experience.",
+  icons: {
+    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
+    shortcut: ["/favicon.svg"],
+  },
 };
 
 export default function RootLayout({

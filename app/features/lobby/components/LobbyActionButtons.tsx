@@ -34,14 +34,16 @@ export function LobbyActionButtons({
         >
           Join Existing Lobby
         </button>
+      </div>
+
+      <div className="flex justify-center sm:justify-start">
         <button
           onClick={flow === "create" ? onCreateLobby : onJoinLobby}
-          className="min-h-11 w-full rounded-xl bg-[var(--accent)] px-4 py-2.5 font-semibold text-[#0a1712] transition hover:brightness-110 sm:w-auto"
+          className="min-h-11 w-full rounded-xl bg-[var(--accent)] px-4 py-2.5 font-semibold text-[#0a1712] transition hover:brightness-110 sm:w-[min(100%,22rem)]"
         >
           Continue
         </button>
       </div>
-
     </div>
   );
 }
