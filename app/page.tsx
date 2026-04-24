@@ -1,11 +1,33 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { GameStageRouter } from "./features/gameplay/components/GameStageRouter";
 import { LobbyActionButtons } from "./features/lobby/components/LobbyActionButtons";
 import { LobbySetupForm } from "./features/lobby/components/LobbySetupForm";
 import { LobbyStatusBar } from "./features/lobby/components/LobbyStatusBar";
 import { useLobbyClient } from "./features/lobby/hooks/useLobbyClient";
+
+const gameSchema = {
+  "@context": "https://schema.org",
+  "@type": "VideoGame",
+  name: "The Mind Online",
+  url: "https://the-mind-game.com",
+  description:
+    "Play The Mind online in your browser with a focused multiplayer lobby experience.",
+  genre: ["Card Game", "Cooperative Game", "Multiplayer"],
+  playMode: "MultiPlayer",
+  applicationCategory: "Game",
+  inLanguage: "en",
+  author: {
+    "@type": "Person",
+    name: "Wolfgang Warsch",
+  },
+  publisher: {
+    "@type": "Organization",
+    name: "The Mind Online",
+  },
+};
 
 function LandingIllustration() {
   return (
@@ -112,6 +134,10 @@ export default function Home() {
 
   return (
     <div className="relative isolate min-h-screen overflow-hidden px-4 py-8 text-stone-100 sm:px-6 sm:py-12">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(gameSchema) }}
+      />
       <div aria-hidden="true" className="pointer-events-none absolute left-[-6rem] top-[-7rem] h-72 w-72 rounded-full bg-[#7ce4c014] blur-3xl" />
       <div aria-hidden="true" className="pointer-events-none absolute right-[-8rem] top-24 h-96 w-96 rounded-full bg-[#6ac8e818] blur-3xl" />
       <main className={mainClasses}>
@@ -131,7 +157,41 @@ export default function Home() {
             : "Enter your name, create a lobby, or join an existing one."}
         </p>
 
+        {!hasJoinedLobby ? (
+          <div className="mt-3 text-sm text-[var(--text-muted)]">
+            Learn the game flow on the {" "}
+            <Link
+              href="/rules"
+              className="text-[var(--text-strong)] underline decoration-[#8fd8d7] underline-offset-2"
+            >
+              rules page
+            </Link>
+            .
+          </div>
+        ) : null}
+
         {!hasJoinedLobby ? <LandingIllustration /> : null}
+
+        {!hasJoinedLobby ? (
+          <section className="mt-8 grid gap-4 text-sm text-[var(--text-muted)] sm:grid-cols-2">
+            <article className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-2)] p-4">
+              <h2 className="text-base font-semibold text-[var(--text-strong)]">
+                How To Play Online
+              </h2>
+              <p className="mt-2 leading-relaxed">
+                Create a lobby, share the code, and start when everyone joins. Your team must play cards in ascending order without revealing values.
+              </p>
+            </article>
+            <article className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-2)] p-4">
+              <h2 className="text-base font-semibold text-[var(--text-strong)]">
+                Rules Summary
+              </h2>
+              <p className="mt-2 leading-relaxed">
+                Wrong timing costs shared lives. Shurikens help clear low cards in difficult rounds. Win by clearing all levels together.
+              </p>
+            </article>
+          </section>
+        ) : null}
 
         {showLobbyControls ? (
           <>

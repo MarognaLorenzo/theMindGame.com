@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">The Mind Online</title>
+  <desc id="desc">Play The Mind online in your browser with your friends.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0a1722"/>
+      <stop offset="50%" stop-color="#123145"/>
+      <stop offset="100%" stop-color="#1a3737"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fffef7"/>
+      <stop offset="100%" stop-color="#efe2c8"/>
+    </linearGradient>
+    <filter id="titleShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#041018" flood-opacity="0.65" />
+    </filter>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <circle cx="130" cy="120" r="160" fill="#6ac8e820"/>
+  <circle cx="1020" cy="520" r="180" fill="#7ce4c026"/>
+
+  <g transform="translate(820,140)">
+    <g transform="translate(-220 100) rotate(-12 75 110)">
+      <rect width="150" height="220" rx="18" fill="url(#card)"/>
+      <text x="75" y="110" text-anchor="middle" dominant-baseline="middle" fill="#24313a" font-size="62" font-weight="700">9</text>
+    </g>
+
+    <g transform="translate(-90 60)">
+      <rect width="170" height="240" rx="18" fill="url(#card)"/>
+      <text x="85" y="120" text-anchor="middle" dominant-baseline="middle" fill="#24313a" font-size="68" font-weight="700">24</text>
+    </g>
+
+    <g transform="translate(60 100) rotate(10 75 110)">
+      <rect width="150" height="220" rx="18" fill="url(#card)"/>
+      <text x="75" y="110" text-anchor="middle" dominant-baseline="middle" fill="#24313a" font-size="60" font-weight="700">36</text>
+    </g>
+  </g>
+
+  <rect x="70" y="102" width="780" height="200" rx="28" fill="#07131fcc" stroke="#8fd8d733" />
+  <text x="90" y="176" fill="#f2fbff" font-size="70" font-family="Arial, Helvetica, sans-serif" font-weight="700" filter="url(#titleShadow)">The Mind Online</text>
+  <text x="90" y="235" fill="#e3eef5" font-size="30" font-family="Arial, Helvetica, sans-serif" font-weight="400" filter="url(#titleShadow)">Silent cooperative card play, in your browser.</text>
+</svg>
