@@ -161,6 +161,10 @@ export function PlayingView({
   const otherPlayers = lobby.players.filter((player) => player.id !== myPlayerId);
   const pilePreview = lobby.discardPile.slice(-5);
   const winningLevel = lobby.winningLevel > 0 ? lobby.winningLevel : "?";
+  const sortedHand = myPlayer?.hand.toSorted((a, b) => a - b) ?? [];
+  const handCount = sortedHand.length;
+  const overlapPx = handCount <= 1 ? 0 : Math.min(42, Math.max(10, Math.round(8 + (handCount - 1) * 3.6)));
+  const tiltCap = handCount >= 9 ? 1 : handCount >= 6 ? 2 : 3;
 
   return (
     <section className="relative mx-auto mt-8 flex min-h-[calc(100vh-13rem)] w-full max-w-4xl flex-col">
@@ -336,31 +340,38 @@ export function PlayingView({
       </div>
 
       <div className="mt-auto pb-2">
-        {/* <div className="mt-8 flex items-center justify-end gap-3">
-          <span className="text-xs text-[var(--text-muted)]">{myPlayer?.hand.length ?? 0} cards in your hand</span>
-        </div> */}
 
-        <div className="mt-4 flex justify-center gap-2 overflow-x-auto pb-2 sm:gap-3">
-          {myPlayer?.hand.length ? (
-            myPlayer.hand.map((card, index) => {
-              const tilt = (index % 2 === 0 ? -1 : 1) * Math.min(index, 3);
+        <div className="mt-4 flex justify-center overflow-x-auto px-2 pb-2">
+          {sortedHand.length ? (
+            <div className="isolate flex items-end py-1">
+              {sortedHand.map((card, index) => {
+                const tilt = (index % 2 === 0 ? -1 : 1) * Math.min(index, tiltCap);
 
-              return (
-                <div key={card} className="flex-none" style={{ transform: `rotate(${tilt}deg)` }}>
-                  <button
-                    onClick={() => onCardPlay(card)}
-                    className="h-32 w-[5.5rem] rounded-2xl border border-[#d8d2bf] bg-gradient-to-b from-[#fffef8] to-[#efe8d7] text-slate-900 shadow-[0_8px_22px_rgba(0,0,0,0.35)] transition hover:-translate-y-1"
-                    aria-label={`Play card ${card}`}
+                return (
+                  <div
+                    key={card}
+                    className="flex-none"
+                    style={{
+                      marginInlineStart: index === 0 ? 0 : `-${overlapPx}px`,
+                      transform: `rotate(${tilt}deg)`,
+                      zIndex: sortedHand.length - index,
+                    }}
                   >
-                    <div className="flex h-full flex-col items-center justify-between p-3">
-                      <span className="self-start text-xs font-semibold text-slate-500">TM</span>
-                      <span className="text-3xl font-semibold">{card}</span>
-                      <span className="self-end text-xs font-semibold text-slate-500">TM</span>
-                    </div>
-                  </button>
-                </div>
-              );
-            })
+                    <button
+                      onClick={() => onCardPlay(card)}
+                      className="h-32 w-[5.5rem] rounded-2xl border border-[#d8d2bf] bg-gradient-to-b from-[#fffef8] to-[#efe8d7] text-slate-900 shadow-[0_8px_22px_rgba(0,0,0,0.35)] transition hover:-translate-y-1 focus-visible:-translate-y-1"
+                      aria-label={`Play card ${card}`}
+                    >
+                      <div className="flex h-full flex-col items-center justify-between p-3">
+                        <span className="self-start text-xs font-semibold text-slate-500">TM</span>
+                        <span className="text-3xl font-semibold">{card}</span>
+                        <span className="self-end text-xs font-semibold text-slate-500">TM</span>
+                      </div>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
           ) : (
             <p className="px-1 text-sm text-[var(--text-muted)]">No cards in hand.</p>
           )}
