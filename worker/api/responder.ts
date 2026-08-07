@@ -33,4 +33,12 @@ export class Responder {
       this.env,
     );
   }
+
+  public respondWithWebSocket(webSocket: WebSocket): Response {
+    return withCors(
+      new Response(null, { status: 101, webSocket }),
+      this.request,
+      this.env,
+    );
+  }
 }

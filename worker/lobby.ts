@@ -1,14 +1,4 @@
-export interface Player {
-  id: string;
-  name: string;
-  hand: number[];
-}
-
-export interface PlayerAttachment {
-  playerId: string;
-  playerName: string;
-}
-
+import type { Player } from "./game/player.ts";
 export interface Lobby {
   players: Player[];
   discardPile: number[];
@@ -33,6 +23,8 @@ export function createInitialLobby(): Lobby {
   };
 }
 
+// Given the name of the player, create a new player and add them to the lobby.
+// If the lobby has no host, make this player the host.
 export function addPlayer(lobby: Lobby, playerName: string): Player {
   const playerId = crypto.randomUUID();
   const newPlayer: Player = { id: playerId, name: playerName, hand: [] };
@@ -45,6 +37,8 @@ export function addPlayer(lobby: Lobby, playerName: string): Player {
   return newPlayer;
 }
 
+// Remove a player from the lobby by their ID. If the player is the host,
+// assign a new host from the remaining players, otherwise set to null.
 export function removePlayer(lobby: Lobby, playerId: string) {
   lobby.players = lobby.players.filter((player) => player.id !== playerId);
 
@@ -53,13 +47,17 @@ export function removePlayer(lobby: Lobby, playerId: string) {
   }
 }
 
+// Let the lobby react if the played card is the lowest card in the game.
+// If it is, remove the card from all players' hands and add it to the discard pile.
+// When all players have no cards left, the level is completed and the game progresses to the next level.
+// If the played card is not the lowest, remove all cards lower than or equal to the played card from all players' hands and add them to the discard pile.
 export function playCard(lobby: Lobby, playedCard: number): boolean {
   const allCards = lobby.players.flatMap((player) => player.hand);
   const minCard = Math.min(...allCards);
 
   if (playedCard === minCard) {
     lobby.players.forEach((player) => {
-      player.hand = player.hand.filter((card) => card !== playedCard);
+      player.hand = player.hand.filter((card: number) => card !== playedCard);
     });
     lobby.discardPile.push(playedCard);
 
@@ -87,44 +85,12 @@ export function playCard(lobby: Lobby, playedCard: number): boolean {
   }
   lobby.discardPile.push(...lowerCards);
   lobby.players.forEach((player) => {
-    player.hand = player.hand.filter((card) => !lowerCards.includes(card));
+    player.hand = player.hand.filter((card: number) => !lowerCards.includes(card));
   });
   return false;
 }
 
-export function useShuriken(lobby: Lobby): boolean {
-  if (lobby.shurikens <= 0) {
-    return false;
-  }
-  const cardsToAdd: number[] = [];
-  if (lobby.players.some((player) => player.hand.length > 1)) {
-
-    for (const player of lobby.players) {
-      if (player.hand.length > 0) {
-        const lowestCard = Math.min(...player.hand);
-        cardsToAdd.push(lowestCard);
-      }
-    }
-  } else {
-    const maxCard = Math.max(...lobby.players.flatMap((player) => player.hand));
-    for (const player of lobby.players) {
-      if (!player.hand.includes(maxCard)) {
-        cardsToAdd.push(...player.hand)
-      }
-    }
-  } 
-  if (cardsToAdd.length === 0) {
-    return false;
-  }
-  
-  for (const player of lobby.players) {
-    player.hand = player.hand.filter((card) => !cardsToAdd.includes(card));
-  }
-  lobby.shurikens -= 1;
-  lobby.discardPile.push(...cardsToAdd);
-  return true;
-}
-
+// Initialize game
 export function startGame(lobby: Lobby): boolean {
   if (lobby.state === "playing") {
     return false;
@@ -145,6 +111,7 @@ export function startGame(lobby: Lobby): boolean {
   return true;
 }
 
+// Assign cards to players based on the current level.
 export function dealCards(lobby: Lobby) {
   const deck = Array.from({ length: 100 }, (_, i) => i + 1).sort(
     () => Math.random() - 0.5,
@@ -158,6 +125,7 @@ export function dealCards(lobby: Lobby) {
   });
 }
 
+// Assign rewards to the lobby based on the current level
 export function assignRewards(lobby: Lobby) {
     if ([2, 5, 8].includes(lobby.currentLevel)) {
       lobby.shurikens = Math.min(lobby.shurikens + 1, 3);

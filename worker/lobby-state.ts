@@ -1,8 +1,9 @@
-import { readPlayerAttachment } from "./lobby-attachments";
+import { readPlayerAttachment } from "./wsAttachmentUtils.ts";
 import type { Lobby, Player } from "./lobby.ts";
 
-// Reconcile the lobby's player list with the currently connected WebSockets.
-// This ensures that if a player disconnects and reconnects, they retain their player ID and hand.
+// Reconcile the list of players in the lobby with the list of connected WebSockets.
+// If a WebSocket has a player attachment, ensure that the player is in the lobby. If it's not, add them.
+// If a player in the lobby does not have a corresponding WebSocket, remove them from the lobby.
 export function reconcilePlayersFromSockets(lobby: Lobby, sockets: WebSocket[]) {
   const playersById = new Map<string, Player>(
     lobby.players.map((player) => [player.id, player]),

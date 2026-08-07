@@ -40,5 +40,5 @@ export async function joinLobby(
       }
 
       const lobbyStub = env.LOBBY_SERVER.get(env.LOBBY_SERVER.idFromString(lobbyDOId));
-      return lobbyStub.fetch(request);
+      return lobbyStub.playerFirstTimeAccess(insertedName, responder);
   }

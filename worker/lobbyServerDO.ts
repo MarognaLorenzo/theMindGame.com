@@ -1,15 +1,17 @@
 import { DurableObject } from "cloudflare:workers";
-import { readPlayerAttachment, writePlayerAttachment } from "./lobby-attachments";
-import { reconcilePlayersFromSockets, toLobbyStatePayload } from "./lobby-state";
+import { readPlayerAttachment, writePlayerAttachment } from "./wsAttachmentUtils.ts";
+import { reconcilePlayersFromSockets, toLobbyStatePayload } from "./lobby-state.ts";
 import {
   addPlayer,
   createInitialLobby,
   playCard,
   removePlayer,
   startGame,
-  useShuriken as spendShuriken,
 } from "./lobby.ts";
-import type { Lobby, Player } from "./lobby.ts";
+import type { Lobby } from "./lobby.ts";
+import { Responder } from "./api/responder.ts";
+import type { Player } from "./game/player.ts";
+import { dispatchWsMessage } from "./wsMessageDispatcher.ts";
 
 const DISCONNECT_GRACE_MS = 120_000;
 const RESUME_TOKENS_KEY = "resume-tokens";
@@ -18,41 +20,16 @@ const PENDING_DISCONNECTS_KEY = "pending-disconnects";
 type ResumeTokens = Record<string, string>;
 type PendingDisconnects = Record<string, number>;
 
-interface JoinPayload {
-  type: "JOIN";
-  resumeToken?: string;
-}
-
-interface StartPayload {
-  type: "START";
-}
-
-interface PlayCardPayload {
-  type: "PLAY_CARD";
-  card: number;
-}
-
-interface UseShurikenPayload {
-  type: "USE_SHURIKEN";
-}
-
-interface ExitGamePayload {
-  type: "EXIT_GAME";
-}
-
-type ClientMessage =
-  | JoinPayload
-  | StartPayload
-  | PlayCardPayload
-  | UseShurikenPayload
-  | ExitGamePayload;
-
 export class LobbyServer extends DurableObject {
   private initialized = false;
 
-  private lobby: Lobby = createInitialLobby();
+  public lobby: Lobby = createInitialLobby();
 
-  private async ensureLoaded() {
+  // As a durable object, this class runtime Lobby might be frozen.
+  // To ensure that the lobby state is loaded before any operations, we check if it's initialized.
+  // If not, we load the state from storage and reconcile the players with the connected WebSockets.
+  // Then we set initialize to true and save the lobby state back to storage.
+  public async ensureLoaded() {
     if (this.initialized) {
       return;
     }
@@ -90,6 +67,8 @@ export class LobbyServer extends DurableObject {
     await this.ctx.storage.put(PENDING_DISCONNECTS_KEY, pending);
   }
 
+  // Check if there is a connected WebSocket for the given player ID,
+  // excluding the provided WebSocket (if any).
   private hasConnectedSocketForPlayer(
     playerId: string,
     except?: globalThis.WebSocket,
@@ -104,6 +83,9 @@ export class LobbyServer extends DurableObject {
     });
   }
 
+  // Schedule a pending disconnect for the given player ID.
+  // A pending disconnect means that the player has disconnected,
+  // but we give them a grace period to reconnect before removing them from the lobby.
   private async scheduleDisconnectRemoval(playerId: string) {
     const pending = await this.loadPendingDisconnects();
     pending[playerId] = Date.now() + DISCONNECT_GRACE_MS;
@@ -146,44 +128,25 @@ export class LobbyServer extends DurableObject {
     reconcilePlayersFromSockets(this.lobby, this.ctx.getWebSockets());
   }
 
-  async fetch(request: Request): Promise<Response> {
+  async playerFirstTimeAccess(playerName: string, responder: Responder): Promise<Response> {
     await this.ensureLoaded();
 
-    const webSocketPair = new WebSocketPair();
-    const [client, server] = Object.values(webSocketPair);
+    const existingPlayer = this.lobby.players.find((player) =>
+      this.isSamePlayerName(player.name, playerName)
+    );
 
-    const url = new URL(request.url);
-    const playerName = url.searchParams.get("name") || "Anonymous";
+    if (existingPlayer) {
+      return responder.respondWithError( "Name already taken.", 400);
+    }
 
-    this.ctx.acceptWebSocket(server, [playerName]);
+    const [clientWs, serverWs] = Object.values(new WebSocketPair());
+    this.ctx.acceptWebSocket(serverWs, [playerName]);
 
-    return new Response(null, { status: 101, webSocket: client });
+    return responder.respondWithWebSocket(clientWs);
   }
 
   async webSocketMessage(ws: WebSocket, message: string) {
-    await this.ensureLoaded();
-
-    const playerName = this.ctx.getTags(ws)?.[0] || "Unknown";
-    const data = JSON.parse(message) as ClientMessage;
-    switch (data.type) {
-      case "JOIN":
-        await this.handleJoinLobby(ws, playerName, data.resumeToken);
-        break;
-      case "START":
-        this.handleStartGame(ws);
-        break;
-      case "PLAY_CARD":
-        this.handlePlayCard(ws, data.card);
-        break;
-      case "USE_SHURIKEN":
-        this.handleUseShuriken(ws);
-        break;
-      case "EXIT_GAME":
-        await this.handleExitGame(ws);
-        break;
-      default:
-        console.error("Unknown message type");
-    }
+    await dispatchWsMessage(ws, message, this);
   }
 
   broadcast(data: object) {
@@ -213,10 +176,6 @@ export class LobbyServer extends DurableObject {
       await this.scheduleDisconnectRemoval(leavingPlayerId);
       this.sendLobbyState();
     }
-
-    void code;
-    void reason;
-    void wasClean;
   }
 
   async alarm() {
@@ -392,14 +351,6 @@ export class LobbyServer extends DurableObject {
 
     await this.saveLobbyState();
     this.sendLobbyState();
-  }
-
-  async handleUseShuriken(ws: WebSocket) {
-    void ws;
-    const success = spendShuriken(this.lobby);
-    if (success) {
-      this.sendLobbyState();
-    }
   }
 
   async handleExitGame(ws: WebSocket) {

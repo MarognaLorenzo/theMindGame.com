@@ -1,4 +1,4 @@
-import { LobbyServer } from "./lobby-server.ts";
+import { LobbyServer } from "./lobbyServerDO.ts";
 import { LobbyRegistry } from "./lobbyRegistryDO.ts";
 import { createLobby, joinLobby } from "./api/lobbyOperations.ts";
 import { Responder } from "./api/responder.ts";

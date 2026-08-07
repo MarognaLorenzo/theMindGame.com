@@ -1,4 +1,8 @@
-import type { PlayerAttachment } from "./lobby";
+
+export interface PlayerAttachment {
+  playerId: string;
+  playerName: string;
+}
 
 // This file handles reading and writing player attachments to WebSockets,
 // which allows us to associate a WebSocket connection with a specific player in the lobby.
