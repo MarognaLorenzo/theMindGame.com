@@ -1,6 +1,6 @@
 import { Env, LobbyRegistry } from "../index.ts";
-import { Responder } from "./responder.ts";
-import { generateShortCode } from "./shortCodeLib.ts";
+import { Responder } from "./utils/responder.ts";
+import { generateShortCode } from "./utils/shortCodeLib.ts";
 
 export async function createLobby(
   registryStub: DurableObjectStub<LobbyRegistry>,

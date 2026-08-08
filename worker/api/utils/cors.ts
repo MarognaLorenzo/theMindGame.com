@@ -1,5 +1,5 @@
 
-import { Env } from "../index.ts";
+import { Env } from "../../index.ts";
 const DEFAULT_ALLOWED_ORIGINS = ["http://localhost:3000"];
 
 function resolveAllowedOrigins(env: Env): string[] {

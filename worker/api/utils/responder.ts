@@ -1,5 +1,5 @@
 import { withCors } from "./cors";
-import { Env } from "../index.ts";
+import { Env } from "../../index.ts";
 
 export class Responder {
   constructor(private request: Request, private env: Env) {}

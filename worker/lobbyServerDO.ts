@@ -1,6 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import { readPlayerAttachment, reconcilePlayersFromSockets, writePlayerAttachment } from "./ws/wsUtils.ts";
-import { Responder } from "./api/responder.ts";
+import { Responder } from "./api/utils/responder.ts";
 import type { Player } from "./game/player.ts";
 import { dispatchWsMessage } from "./ws/wsMessageDispatcher.ts";
 import { createEmptyRoom, Room } from "./game/room.ts";
