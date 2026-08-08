@@ -1,5 +1,5 @@
 import { ownsCard } from "../wsAuthorization.ts";
-import { WsMessageHandler } from "../wsMessageDispatcher.ts";
+import { WsMessageHandler } from "../wsMessageHandler.ts";
 import { LobbyServer } from "../../index.ts";
 import { wsSendError } from "../wsUtils.ts";
 

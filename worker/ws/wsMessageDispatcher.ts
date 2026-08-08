@@ -5,12 +5,6 @@ import { PlayCardHandler } from "./handlers/playCardHandler.ts";
 import { UseShurikenHandler } from "./handlers/useShurikenHandler.ts";
 import { ExitGameHandler } from "./handlers/exitGameHandler.ts";
 
-
-export abstract class WsMessageHandler {
-    abstract type : string;
-    abstract handleMessage: (ws: WebSocket, lobbyServer: LobbyServer) => Promise<void>;
-}
-
 export async function dispatchWsMessage(ws: WebSocket, message: string, lobbyServer: LobbyServer) : Promise<void> {
     await lobbyServer.ensureLoaded();
 

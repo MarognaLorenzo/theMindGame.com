@@ -1,4 +1,4 @@
-import { WsMessageHandler } from "../wsMessageDispatcher.ts";
+import { WsMessageHandler } from "../wsMessageHandler.ts";
 import { LobbyServer } from "../../index.ts";
 import { analyzeAttachment } from "../wsAuthorization.ts";
 import { writePlayerAttachment, wsSendError, wsSendJoined } from "../wsUtils.ts";
