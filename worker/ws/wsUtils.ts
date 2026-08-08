@@ -34,6 +34,17 @@ export function wsSendError(ws: WebSocket, message: string) {
     );
 }
 
+export function wsSendJoined(ws: WebSocket, playerId: string, playerName: string, resumeToken: string) {
+    ws.send(
+        JSON.stringify({
+            type: "JOINED",
+            playerId,
+            playerName,
+            resumeToken,
+        })
+    );
+}
+
 function getAttachmentIds(sockets: WebSocket[]): Set<string> {
     const ids = new Set<string>();
     for (const ws of sockets) {

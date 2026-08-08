@@ -10,6 +10,9 @@ class_name = "LobbyServer"
 name = "LOBBY_REGISTRY"
 class_name = "LobbyRegistry"
 
+[[durable_objects.bindings]]
+name = "RESUME_TOKENS_MANAGER
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["LobbyServer"]

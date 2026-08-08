@@ -200,6 +200,13 @@ export class Room {
       this.hostPlayerId = this.players[0]?.id ?? null;
     }
   }
+
+  public tryGetPlayerById(playerId: string | null): Player | undefined {
+    if (!playerId) {
+      return undefined;
+    }
+    return this.players.find((player) => player.id === playerId);
+  }
 }
 
 export function createEmptyRoom(): Room {

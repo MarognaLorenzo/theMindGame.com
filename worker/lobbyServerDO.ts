@@ -1,16 +1,17 @@
 import { DurableObject } from "cloudflare:workers";
-import { readPlayerAttachment, reconcilePlayersFromSockets, writePlayerAttachment } from "./ws/wsUtils.ts";
+import { readPlayerAttachment, reconcilePlayersFromSockets, writePlayerAttachment, wsSendJoined } from "./ws/wsUtils.ts";
 import { Responder } from "./api/utils/responder.ts";
 import type { Player } from "./game/player.ts";
 import { dispatchWsMessage } from "./ws/wsMessageDispatcher.ts";
 import { createEmptyRoom, Room } from "./game/room.ts";
 import {wsSendError} from "./ws/wsUtils.ts";
+import { ResumeTokenManager } from "./connections/resumeTokens.ts";
+import { analyzeAttachment } from "./ws/wsAuthorization.ts";
 
 const DISCONNECT_GRACE_MS = 120_000;
-const RESUME_TOKENS_KEY = "resume-tokens";
+
 const PENDING_DISCONNECTS_KEY = "pending-disconnects";
 
-type ResumeTokens = Record<string, string>;
 type PendingDisconnects = Record<string, number>;
 
 export class LobbyServer extends DurableObject {
@@ -18,10 +19,13 @@ export class LobbyServer extends DurableObject {
 
   public room: Room = createEmptyRoom();
 
+  public tokensManager = new ResumeTokenManager(this.ctx.storage);
+
   // As a durable object, this class runtime Lobby might be frozen.
   // To ensure that the lobby state is loaded before any operations, we check if it's initialized.
   // If not, we load the state from storage and reconcile the players with the connected WebSockets.
   // Then we set initialize to true and save the lobby state back to storage.
+
   public async ensureLoaded() {
     if (this.initialized) {
       return;
@@ -41,14 +45,6 @@ export class LobbyServer extends DurableObject {
     await this.ctx.storage.put("lobby-state", this.room);
   }
 
-  public async loadResumeTokens(): Promise<ResumeTokens> {
-    return (await this.ctx.storage.get<ResumeTokens>(RESUME_TOKENS_KEY)) ?? {};
-  }
-
-  public async saveResumeTokens(tokens: ResumeTokens) {
-    await this.ctx.storage.put(RESUME_TOKENS_KEY, tokens);
-  }
-
   private async loadPendingDisconnects(): Promise<PendingDisconnects> {
     return (
       (await this.ctx.storage.get<PendingDisconnects>(PENDING_DISCONNECTS_KEY)) ??
@@ -62,7 +58,7 @@ export class LobbyServer extends DurableObject {
 
   // Check if there is a connected WebSocket for the given player ID,
   // excluding the provided WebSocket (if any).
-  private hasConnectedSocketForPlayer(
+  public hasConnectedSocketForPlayer(
     playerId: string,
     except?: globalThis.WebSocket,
   ): boolean {
@@ -106,12 +102,7 @@ export class LobbyServer extends DurableObject {
     }
   }
 
-  private findResumeTokenForPlayer(
-    tokens: ResumeTokens,
-    playerId: string,
-  ): string | null {
-    return Object.entries(tokens).find(([, id]) => id === playerId)?.[0] ?? null;
-  }
+
 
   private reconcilePlayersFromSockets() {
     reconcilePlayersFromSockets(this.room, this.ctx.getWebSockets());
@@ -193,116 +184,15 @@ export class LobbyServer extends DurableObject {
     }
 
     if (didRemovePlayer) {
-      const resumeTokens = await this.loadResumeTokens();
-      let tokensChanged = false;
+      await this.tokensManager.load();
+      const isSomeoneRemoved: boolean = this.tokensManager.filterOutEntriesOfPlayersNotInRoom(this.room);
 
-      for (const [token, tokenPlayerId] of Object.entries(resumeTokens)) {
-        if (this.room.players.some((player) => player.id === tokenPlayerId)) {
-          continue;
-        }
-        delete resumeTokens[token];
-        tokensChanged = true;
-      }
-
-      if (tokensChanged) {
-        await this.saveResumeTokens(resumeTokens);
+      if (isSomeoneRemoved) {
+        await this.tokensManager.storeMap();
       }
 
       await this.saveLobbyState();
       this.sendLobbyState();
     }
-  }
-
-  async handleJoinLobby(
-    ws: WebSocket,
-    resumeToken?: string,
-  ) {
-    const wsAttachment = readPlayerAttachment(ws);
-    const requestedName = wsAttachment?.playerName ?? "Anonymous";
-    const resumeTokens = await this.loadResumeTokens();
-
-    if (wsAttachment) {
-      const existingResumeToken = this.findResumeTokenForPlayer(
-        resumeTokens,
-        wsAttachment.playerId,
-      );
-
-      ws.send(
-        JSON.stringify({
-          type: "JOINED",
-          playerId: wsAttachment.playerId,
-          playerName: wsAttachment.playerName,
-          resumeToken: existingResumeToken,
-        }),
-      );
-      this.sendLobbyState();
-      return;
-    }
-
-    let joinedPlayer: Player | null = null;
-    let tokenToUse = resumeToken;
-
-    if (resumeToken) {
-      const restoredPlayerId = resumeTokens[resumeToken];
-      const restoredPlayer = this.room.players.find(
-        (player) => player.id === restoredPlayerId,
-      );
-
-      if (restoredPlayer) {
-        if (this.hasConnectedSocketForPlayer(restoredPlayer.id)) {
-          wsSendError(ws, "This player is already connected in the lobby.");
-          return;
-        }
-        joinedPlayer = restoredPlayer;
-      } else {
-        wsSendError(ws, "Reconnect session expired. Please join the lobby again.");
-        return;
-      }
-    }
-
-    if (!joinedPlayer) {
-      const existingPlayerByName = this.room.getPlayerByName(requestedName);
-
-      if (existingPlayerByName) {
-        if (this.hasConnectedSocketForPlayer(existingPlayerByName.id)) {
-          wsSendError(ws, "A player with this name is already connected. Reconnect from that session instead.");
-          return;
-        }
-
-        joinedPlayer = existingPlayerByName;
-        tokenToUse =
-          this.findResumeTokenForPlayer(resumeTokens, joinedPlayer.id) ?? undefined;
-
-        if (!tokenToUse) {
-          tokenToUse = crypto.randomUUID();
-          resumeTokens[tokenToUse] = joinedPlayer.id;
-          await this.saveResumeTokens(resumeTokens);
-        }
-      } else {
-        joinedPlayer = this.room.createAddPlayer(requestedName);
-        tokenToUse = crypto.randomUUID();
-        resumeTokens[tokenToUse] = joinedPlayer.id;
-        await this.saveResumeTokens(resumeTokens);
-      }
-    }
-
-    writePlayerAttachment(ws, {
-      playerId: joinedPlayer.id,
-      playerName: joinedPlayer.name,
-    });
-
-    await this.clearPendingDisconnect(joinedPlayer.id);
-
-    ws.send(
-      JSON.stringify({
-        type: "JOINED",
-        playerId: joinedPlayer.id,
-        playerName: joinedPlayer.name,
-        resumeToken: tokenToUse,
-      }),
-    );
-
-    await this.saveLobbyState();
-    this.sendLobbyState();
   }
 }

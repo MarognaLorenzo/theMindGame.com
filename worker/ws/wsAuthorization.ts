@@ -3,10 +3,12 @@ import { readPlayerAttachment } from "./wsUtils.ts";
 
 export interface WsAuthResult {
   isValid: boolean;
+  playerId?: string;
+  playerName?: string;
   errorMessage?: string;
 }
 
-export function hasValidAttachment(ws: WebSocket): WsAuthResult {
+export function analyzeAttachment(ws: WebSocket): WsAuthResult {
     const attachment = readPlayerAttachment(ws);
     const isValid = !!attachment?.playerId && !!attachment?.playerName;
 
@@ -17,15 +19,15 @@ export function hasValidAttachment(ws: WebSocket): WsAuthResult {
         };
     }
 
-    return { isValid: true };
+    return { isValid: true , playerId: attachment.playerId, playerName: attachment.playerName};
 }
 
 export function isInGame(ws: WebSocket, room: Room): WsAuthResult {
-    const attachmentResult = hasValidAttachment(ws);
+    const attachmentResult = analyzeAttachment(ws);
     if (!attachmentResult.isValid) {
         return attachmentResult;
     }
-    const playerId = readPlayerAttachment(ws)?.playerId;
+    const playerId = attachmentResult.playerId;
     const isInGame = room.players.some((player) => player.id === playerId);
     if (!isInGame) {
         return {
@@ -33,7 +35,7 @@ export function isInGame(ws: WebSocket, room: Room): WsAuthResult {
             errorMessage: "Player is not in the game.",
         };
     }
-    return { isValid: true };
+    return { isValid: true , playerId: attachmentResult.playerId, playerName: attachmentResult.playerName};
 }
 
 export function isHostWs(ws: WebSocket, room: Room): WsAuthResult {
@@ -41,7 +43,7 @@ export function isHostWs(ws: WebSocket, room: Room): WsAuthResult {
     if (!isInGameResult.isValid) {
         return isInGameResult;
     }
-    const playerId = readPlayerAttachment(ws)?.playerId;
+    const playerId = isInGameResult.playerId;
     const isHost = playerId === room.hostPlayerId;
     if (!isHost) {
         return {
@@ -49,7 +51,7 @@ export function isHostWs(ws: WebSocket, room: Room): WsAuthResult {
             errorMessage: "Player is not the host.",
         };
     }
-    return { isValid: true };
+    return { isValid: true , playerId: isInGameResult.playerId, playerName: isInGameResult.playerName};
 }
 
 export function ownsCard(ws: WebSocket, room: Room, card: number): WsAuthResult {
@@ -57,7 +59,7 @@ export function ownsCard(ws: WebSocket, room: Room, card: number): WsAuthResult 
     if (!isInGameResult.isValid) {
         return isInGameResult;
     }
-    const playerId = readPlayerAttachment(ws)?.playerId ?? "NotExistingPlayer"; // Impossible to reach due to isInGame check, but TypeScript needs this fallback
+    const playerId = isInGameResult.playerId??"";
     const ownsCard = room.playerHasCard(playerId, card);
     if (!ownsCard) {
         return {
@@ -65,5 +67,5 @@ export function ownsCard(ws: WebSocket, room: Room, card: number): WsAuthResult 
             errorMessage: "Player does not own that card.",
         };
     }
-    return { isValid: true };
+    return { isValid: true , playerId: isInGameResult.playerId, playerName: isInGameResult.playerName};
 }
