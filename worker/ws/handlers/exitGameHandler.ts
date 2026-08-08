@@ -14,7 +14,7 @@ export class ExitGameHandler extends WsMessageHandler {
         
         const playerId = isPlayerInGameResult.playerId!;
 
-        await lobbyServer.clearPendingDisconnect(playerId);
+        await lobbyServer.pendingDisconnectionsManager.clearDisconnectDeadlineForPlayer(playerId);
         lobbyServer.room.removePlayer(playerId);
 
         lobbyServer.tokensManager.load()

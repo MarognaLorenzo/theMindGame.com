@@ -1,18 +1,10 @@
 import { DurableObject } from "cloudflare:workers";
-import { readPlayerAttachment, reconcilePlayersFromSockets, writePlayerAttachment, wsSendJoined } from "./ws/wsUtils.ts";
+import { addMissingPlayersFromSockets, filterPlayersWithoutSockets, readPlayerAttachment } from "./ws/wsUtils.ts";
 import { Responder } from "./api/utils/responder.ts";
-import type { Player } from "./game/player.ts";
 import { dispatchWsMessage } from "./ws/wsMessageDispatcher.ts";
 import { createEmptyRoom, Room } from "./game/room.ts";
-import {wsSendError} from "./ws/wsUtils.ts";
 import { ResumeTokenManager } from "./connections/resumeTokens.ts";
-import { analyzeAttachment } from "./ws/wsAuthorization.ts";
-
-const DISCONNECT_GRACE_MS = 120_000;
-
-const PENDING_DISCONNECTS_KEY = "pending-disconnects";
-
-type PendingDisconnects = Record<string, number>;
+import {PendingDisconnectionsManager} from "./connections/pendingDisconnections.ts";
 
 export class LobbyServer extends DurableObject {
   private initialized = false;
@@ -20,6 +12,7 @@ export class LobbyServer extends DurableObject {
   public room: Room = createEmptyRoom();
 
   public tokensManager = new ResumeTokenManager(this.ctx.storage);
+  public pendingDisconnectionsManager = new PendingDisconnectionsManager(this.ctx.storage);
 
   // As a durable object, this class runtime Lobby might be frozen.
   // To ensure that the lobby state is loaded before any operations, we check if it's initialized.
@@ -45,17 +38,6 @@ export class LobbyServer extends DurableObject {
     await this.ctx.storage.put("lobby-state", this.room);
   }
 
-  private async loadPendingDisconnects(): Promise<PendingDisconnects> {
-    return (
-      (await this.ctx.storage.get<PendingDisconnects>(PENDING_DISCONNECTS_KEY)) ??
-      {}
-    );
-  }
-
-  private async savePendingDisconnects(pending: PendingDisconnects) {
-    await this.ctx.storage.put(PENDING_DISCONNECTS_KEY, pending);
-  }
-
   // Check if there is a connected WebSocket for the given player ID,
   // excluding the provided WebSocket (if any).
   public hasConnectedSocketForPlayer(
@@ -72,40 +54,10 @@ export class LobbyServer extends DurableObject {
     });
   }
 
-  // Schedule a pending disconnect for the given player ID.
-  // A pending disconnect means that the player has disconnected,
-  // but we give them a grace period to reconnect before removing them from the lobby.
-  private async scheduleDisconnectRemoval(playerId: string) {
-    const pending = await this.loadPendingDisconnects();
-    pending[playerId] = Date.now() + DISCONNECT_GRACE_MS;
-
-    await this.savePendingDisconnects(pending);
-
-    const soonestExpiry = Math.min(...Object.values(pending));
-    await this.ctx.storage.setAlarm(soonestExpiry);
-  }
-
-  public async clearPendingDisconnect(playerId: string) {
-    const pending = await this.loadPendingDisconnects();
-    if (!(playerId in pending)) {
-      return;
-    }
-
-    delete pending[playerId];
-    await this.savePendingDisconnects(pending);
-
-    const remainingDeadlines = Object.values(pending);
-    if (remainingDeadlines.length > 0) {
-      await this.ctx.storage.setAlarm(Math.min(...remainingDeadlines));
-    } else {
-      await this.ctx.storage.deleteAlarm();
-    }
-  }
-
-
-
   private reconcilePlayersFromSockets() {
-    reconcilePlayersFromSockets(this.room, this.ctx.getWebSockets());
+      addMissingPlayersFromSockets(this.room, this.ctx.getWebSockets());
+      filterPlayersWithoutSockets(this.room, this.ctx.getWebSockets());
+      this.room.restoreHostPlayerId();
   }
 
   async playerFirstTimeAccess(playerName: string, responder: Responder): Promise<Response> {
@@ -149,7 +101,7 @@ export class LobbyServer extends DurableObject {
 
     const leavingPlayerId = readPlayerAttachment(ws)?.playerId;
     if (leavingPlayerId && !this.hasConnectedSocketForPlayer(leavingPlayerId, ws)) {
-      await this.scheduleDisconnectRemoval(leavingPlayerId);
+      await this.pendingDisconnectionsManager.setDisconnectDeadlineForPlayer(leavingPlayerId);
       this.sendLobbyState();
     }
   }
@@ -157,30 +109,13 @@ export class LobbyServer extends DurableObject {
   async alarm() {
     await this.ensureLoaded();
 
-    const now = Date.now();
-    const pending = await this.loadPendingDisconnects();
     let didRemovePlayer = false;
-
-    for (const [playerId, expiry] of Object.entries(pending)) {
-      if (expiry > now) {
-        continue;
-      }
-
+    const playersToDisconnect = this.pendingDisconnectionsManager.playersToDisconnect();
+    for (const playerId of playersToDisconnect) {
       if (!this.hasConnectedSocketForPlayer(playerId)) {
         this.room.removePlayer(playerId);
         didRemovePlayer = true;
       }
-
-      delete pending[playerId];
-    }
-
-    await this.savePendingDisconnects(pending);
-
-    const remainingDeadlines = Object.values(pending);
-    if (remainingDeadlines.length > 0) {
-      await this.ctx.storage.setAlarm(Math.min(...remainingDeadlines));
-    } else {
-      await this.ctx.storage.deleteAlarm();
     }
 
     if (didRemovePlayer) {

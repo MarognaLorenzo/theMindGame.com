@@ -44,7 +44,7 @@ export class JoinPlayerHandler extends WsMessageHandler {
                 playerName: maybePlayer.name,
             });
 
-            await lobbyServer.clearPendingDisconnect(maybePlayer.id);
+            lobbyServer.pendingDisconnectionsManager.clearDisconnectDeadlineForPlayer(maybePlayer.id);
 
             // Initialize the resume token for this player with a new one
             const newUserToken = lobbyServer.tokensManager.assignNewTokenToPlayer(maybePlayer.id);

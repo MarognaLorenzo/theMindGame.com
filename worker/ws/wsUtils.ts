@@ -56,14 +56,14 @@ function getAttachmentIds(sockets: WebSocket[]): Set<string> {
     return ids;
 }
 
-function filterPlayersWithoutSockets(room: Room, sockets: WebSocket[]) {
+export function filterPlayersWithoutSockets(room: Room, sockets: WebSocket[]) {
     const attachmentIds = getAttachmentIds(sockets);
     room.players = room.players.filter((player) =>
         attachmentIds.has(player.id)
     );
 }
 
-function addMissingPlayersFromSockets(room: Room, sockets: WebSocket[]) {
+export function addMissingPlayersFromSockets(room: Room, sockets: WebSocket[]) {
     const attachmentIds = getAttachmentIds(sockets);
     for (const ws of sockets) {
         const attachment = readPlayerAttachment(ws);
@@ -76,13 +76,4 @@ function addMissingPlayersFromSockets(room: Room, sockets: WebSocket[]) {
             );
         }
     }
-}
-
-// Reconcile the list of players in the lobby with the list of connected WebSockets.
-// If a WebSocket has a player attachment, ensure that the player is in the lobby. If it's not, add them.
-// If a player in the lobby does not have a corresponding WebSocket, remove them from the lobby.
-export function reconcilePlayersFromSockets(room: Room, sockets: WebSocket[]) {
-  addMissingPlayersFromSockets(room, sockets);
-  filterPlayersWithoutSockets(room, sockets);
-  room.restoreHostPlayerId();
 }
