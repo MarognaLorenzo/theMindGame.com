@@ -1,8 +1,7 @@
 import { isInGame } from "../wsAuthorization.ts";
 import { WsMessageHandler } from "../wsMessageDispatcher.ts";
 import { LobbyServer } from "../../index.ts";
-import { removePlayer } from "../../lobby.ts";
-import { readPlayerAttachment, wsSendError } from "../wsUtils.ts";
+import { wsSendError } from "../wsUtils.ts";
 
 export class ExitGameHandler extends WsMessageHandler {
     type: "EXIT_GAME" = "EXIT_GAME";

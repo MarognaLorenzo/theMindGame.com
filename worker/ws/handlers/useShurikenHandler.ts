@@ -13,7 +13,7 @@ export class UseShurikenHandler extends WsMessageHandler {
         }
     if (await lobbyServer.room.tryUseShuriken()) {
         await lobbyServer.saveLobbyState();
-        await lobbyServer.sendLobbyState();
+        lobbyServer.sendLobbyState();
         await lobbyServer.broadcast({ type: "SHURIKEN_USED" });
     }
     };
