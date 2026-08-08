@@ -1,17 +1,10 @@
 import { DurableObject } from "cloudflare:workers";
-import { readPlayerAttachment, writePlayerAttachment } from "./wsAttachmentUtils.ts";
-import { reconcilePlayersFromSockets, toLobbyStatePayload } from "./lobby-state.ts";
-import {
-  addPlayer,
-  createInitialLobby,
-  playCard,
-  removePlayer,
-  startGame,
-} from "./lobby.ts";
-import type { Lobby } from "./lobby.ts";
+import { readPlayerAttachment, reconcilePlayersFromSockets, writePlayerAttachment } from "./ws/wsUtils.ts";
 import { Responder } from "./api/responder.ts";
 import type { Player } from "./game/player.ts";
-import { dispatchWsMessage } from "./wsMessageDispatcher.ts";
+import { dispatchWsMessage } from "./ws/wsMessageDispatcher.ts";
+import { createEmptyRoom, Room } from "./game/room.ts";
+import {wsSendError} from "./ws/wsUtils.ts";
 
 const DISCONNECT_GRACE_MS = 120_000;
 const RESUME_TOKENS_KEY = "resume-tokens";
@@ -23,7 +16,7 @@ type PendingDisconnects = Record<string, number>;
 export class LobbyServer extends DurableObject {
   private initialized = false;
 
-  public lobby: Lobby = createInitialLobby();
+  public room: Room = createEmptyRoom();
 
   // As a durable object, this class runtime Lobby might be frozen.
   // To ensure that the lobby state is loaded before any operations, we check if it's initialized.
@@ -34,9 +27,9 @@ export class LobbyServer extends DurableObject {
       return;
     }
 
-    const storedLobby = await this.ctx.storage.get<Lobby>("lobby-state");
+    const storedLobby = await this.ctx.storage.get<Room>("lobby-state");
     if (storedLobby) {
-      this.lobby = storedLobby;
+      this.room = storedLobby;
     }
 
     this.reconcilePlayersFromSockets();
@@ -44,15 +37,15 @@ export class LobbyServer extends DurableObject {
     await this.saveLobbyState();
   }
 
-  private async saveLobbyState() {
-    await this.ctx.storage.put("lobby-state", this.lobby);
+  public async saveLobbyState() {
+    await this.ctx.storage.put("lobby-state", this.room);
   }
 
-  private async loadResumeTokens(): Promise<ResumeTokens> {
+  public async loadResumeTokens(): Promise<ResumeTokens> {
     return (await this.ctx.storage.get<ResumeTokens>(RESUME_TOKENS_KEY)) ?? {};
   }
 
-  private async saveResumeTokens(tokens: ResumeTokens) {
+  public async saveResumeTokens(tokens: ResumeTokens) {
     await this.ctx.storage.put(RESUME_TOKENS_KEY, tokens);
   }
 
@@ -96,7 +89,7 @@ export class LobbyServer extends DurableObject {
     await this.ctx.storage.setAlarm(soonestExpiry);
   }
 
-  private async clearPendingDisconnect(playerId: string) {
+  public async clearPendingDisconnect(playerId: string) {
     const pending = await this.loadPendingDisconnects();
     if (!(playerId in pending)) {
       return;
@@ -113,10 +106,6 @@ export class LobbyServer extends DurableObject {
     }
   }
 
-  private isSamePlayerName(a: string, b: string): boolean {
-    return a.trim().toLowerCase() === b.trim().toLowerCase();
-  }
-
   private findResumeTokenForPlayer(
     tokens: ResumeTokens,
     playerId: string,
@@ -125,17 +114,13 @@ export class LobbyServer extends DurableObject {
   }
 
   private reconcilePlayersFromSockets() {
-    reconcilePlayersFromSockets(this.lobby, this.ctx.getWebSockets());
+    reconcilePlayersFromSockets(this.room, this.ctx.getWebSockets());
   }
 
   async playerFirstTimeAccess(playerName: string, responder: Responder): Promise<Response> {
     await this.ensureLoaded();
 
-    const existingPlayer = this.lobby.players.find((player) =>
-      this.isSamePlayerName(player.name, playerName)
-    );
-
-    if (existingPlayer) {
+    if (this.room.isPlayerNameInUse(playerName)) {
       return responder.respondWithError( "Name already taken.", 400);
     }
 
@@ -159,7 +144,7 @@ export class LobbyServer extends DurableObject {
     this.reconcilePlayersFromSockets();
     this.broadcast({
       type: "LOBBY_STATE",
-      lobby: toLobbyStatePayload(this.lobby),
+      lobby: this.room.getPayload(),
     });
   }
 
@@ -191,7 +176,7 @@ export class LobbyServer extends DurableObject {
       }
 
       if (!this.hasConnectedSocketForPlayer(playerId)) {
-        removePlayer(this.lobby, playerId);
+        this.room.removePlayer(playerId);
         didRemovePlayer = true;
       }
 
@@ -212,7 +197,7 @@ export class LobbyServer extends DurableObject {
       let tokensChanged = false;
 
       for (const [token, tokenPlayerId] of Object.entries(resumeTokens)) {
-        if (this.lobby.players.some((player) => player.id === tokenPlayerId)) {
+        if (this.room.players.some((player) => player.id === tokenPlayerId)) {
           continue;
         }
         delete resumeTokens[token];
@@ -228,38 +213,25 @@ export class LobbyServer extends DurableObject {
     }
   }
 
-  async handlePlayCard(ws: WebSocket, playedCard: number) {
-    void ws;
-    const isAccepted = playCard(this.lobby, playedCard);
-    if (!isAccepted) {
-      // check if game is over:
-      if (this.lobby.lives <= 0) {
-        this.lobby.state = "lost";
-      }
-    }
-    await this.saveLobbyState();
-    this.sendLobbyState();
-  }
-
   async handleJoinLobby(
     ws: WebSocket,
-    playerName: string,
     resumeToken?: string,
   ) {
-    const requestedName = playerName.trim() || "Anonymous";
-    const existingAttachment = readPlayerAttachment(ws);
-    if (existingAttachment) {
-      const resumeTokens = await this.loadResumeTokens();
+    const wsAttachment = readPlayerAttachment(ws);
+    const requestedName = wsAttachment?.playerName ?? "Anonymous";
+    const resumeTokens = await this.loadResumeTokens();
+
+    if (wsAttachment) {
       const existingResumeToken = this.findResumeTokenForPlayer(
         resumeTokens,
-        existingAttachment.playerId,
+        wsAttachment.playerId,
       );
 
       ws.send(
         JSON.stringify({
           type: "JOINED",
-          playerId: existingAttachment.playerId,
-          playerName: existingAttachment.playerName,
+          playerId: wsAttachment.playerId,
+          playerName: wsAttachment.playerName,
           resumeToken: existingResumeToken,
         }),
       );
@@ -267,52 +239,33 @@ export class LobbyServer extends DurableObject {
       return;
     }
 
-    const resumeTokens = await this.loadResumeTokens();
     let joinedPlayer: Player | null = null;
     let tokenToUse = resumeToken;
 
     if (resumeToken) {
       const restoredPlayerId = resumeTokens[resumeToken];
-      const restoredPlayer = this.lobby.players.find(
+      const restoredPlayer = this.room.players.find(
         (player) => player.id === restoredPlayerId,
       );
 
       if (restoredPlayer) {
         if (this.hasConnectedSocketForPlayer(restoredPlayer.id)) {
-          ws.send(
-            JSON.stringify({
-              type: "ERROR",
-              message: "This player is already connected in the lobby.",
-            }),
-          );
+          wsSendError(ws, "This player is already connected in the lobby.");
           return;
         }
         joinedPlayer = restoredPlayer;
       } else {
-        ws.send(
-          JSON.stringify({
-            type: "ERROR",
-            message: "Reconnect session expired. Please join the lobby again.",
-          }),
-        );
+        wsSendError(ws, "Reconnect session expired. Please join the lobby again.");
         return;
       }
     }
 
     if (!joinedPlayer) {
-      const existingPlayerByName = this.lobby.players.find((player) =>
-        this.isSamePlayerName(player.name, requestedName),
-      );
+      const existingPlayerByName = this.room.getPlayerByName(requestedName);
 
       if (existingPlayerByName) {
         if (this.hasConnectedSocketForPlayer(existingPlayerByName.id)) {
-          ws.send(
-            JSON.stringify({
-              type: "ERROR",
-              message:
-                "A player with this name is already connected. Reconnect from that session instead.",
-            }),
-          );
+          wsSendError(ws, "A player with this name is already connected. Reconnect from that session instead.");
           return;
         }
 
@@ -326,7 +279,7 @@ export class LobbyServer extends DurableObject {
           await this.saveResumeTokens(resumeTokens);
         }
       } else {
-        joinedPlayer = addPlayer(this.lobby, requestedName);
+        joinedPlayer = this.room.createAddPlayer(requestedName);
         tokenToUse = crypto.randomUUID();
         resumeTokens[tokenToUse] = joinedPlayer.id;
         await this.saveResumeTokens(resumeTokens);
@@ -351,71 +304,5 @@ export class LobbyServer extends DurableObject {
 
     await this.saveLobbyState();
     this.sendLobbyState();
-  }
-
-  async handleExitGame(ws: WebSocket) {
-    const playerId = readPlayerAttachment(ws)?.playerId;
-    if (!playerId) {
-      return;
-    }
-
-    await this.clearPendingDisconnect(playerId);
-    removePlayer(this.lobby, playerId);
-
-    const resumeTokens = await this.loadResumeTokens();
-    let tokensChanged = false;
-    for (const [token, tokenPlayerId] of Object.entries(resumeTokens)) {
-      if (tokenPlayerId !== playerId) {
-        continue;
-      }
-      delete resumeTokens[token];
-      tokensChanged = true;
-    }
-
-    if (tokensChanged) {
-      await this.saveResumeTokens(resumeTokens);
-    }
-
-    if (this.lobby.state === "playing") {
-      this.lobby.state = "waiting";
-      this.lobby.discardPile = [];
-      this.lobby.lives = 0;
-      this.lobby.shurikens = 0;
-      this.lobby.currentLevel = 0;
-      this.lobby.winningLevel = 0;
-      this.lobby.players.forEach((player) => {
-        player.hand = [];
-      });
-
-      this.broadcast({
-        type: "GAME_ABORTED",
-        message: "A player exited the game. Returning everyone to home.",
-      });
-    }
-
-    await this.saveLobbyState();
-    this.sendLobbyState();
-  }
-
-  handleStartGame(ws: WebSocket) {
-    const playerId = readPlayerAttachment(ws)?.playerId;
-    if (!playerId || playerId !== this.lobby.hostPlayerId) {
-      ws.send(
-        JSON.stringify({
-          type: "ERROR",
-          message: "Only the lobby creator can start the game.",
-        }),
-      );
-      return;
-    }
-
-    if (startGame(this.lobby)) {
-      this.broadcast({
-        type: "GAME_STARTED",
-        players: this.lobby.players.map((p) => ({ id: p.id, name: p.name })),
-      });
-      void this.saveLobbyState();
-      this.sendLobbyState();
-    }
   }
 }
