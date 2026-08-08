@@ -212,3 +212,24 @@ export class Room {
 export function createEmptyRoom(): Room {
   return new Room();
 }
+
+export function hydrateRoom(roomData: Partial<Room> | null | undefined): Room {
+  const room = new Room();
+
+  if (!roomData) {
+    return room;
+  }
+
+  room.players = (roomData.players ?? []).map(
+    (player) => new Player(player.id, player.name, player.hand ?? []),
+  );
+  room.discardPile = roomData.discardPile ?? [];
+  room.lives = roomData.lives ?? 0;
+  room.shurikens = roomData.shurikens ?? 0;
+  room.currentLevel = roomData.currentLevel ?? 0;
+  room.winningLevel = roomData.winningLevel ?? 0;
+  room.state = roomData.state ?? "waiting";
+  room.hostPlayerId = roomData.hostPlayerId ?? null;
+
+  return room;
+}

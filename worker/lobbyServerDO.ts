@@ -2,7 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 import { addMissingPlayersFromSockets, filterPlayersWithoutSockets, readPlayerAttachment } from "./ws/wsUtils.ts";
 import { Responder } from "./api/utils/responder.ts";
 import { dispatchWsMessage } from "./ws/wsMessageDispatcher.ts";
-import { createEmptyRoom, Room } from "./game/room.ts";
+import { createEmptyRoom, hydrateRoom, Room } from "./game/room.ts";
 import { ResumeTokenManager } from "./connections/resumeTokens.ts";
 import {PendingDisconnectionsManager} from "./connections/pendingDisconnections.ts";
 
@@ -26,7 +26,7 @@ export class LobbyServer extends DurableObject {
 
     const storedLobby = await this.ctx.storage.get<Room>("lobby-state");
     if (storedLobby) {
-      this.room = storedLobby;
+      this.room = hydrateRoom(storedLobby);
     }
 
     this.reconcilePlayersFromSockets();
@@ -62,15 +62,24 @@ export class LobbyServer extends DurableObject {
 
   async playerFirstTimeAccess(playerName: string, responder: Responder): Promise<Response> {
     await this.ensureLoaded();
-
+    console.log(`\n\n\nPlayer ${playerName} is trying to join the lobby.\n\n\n`);
     if (this.room.isPlayerNameInUse(playerName)) {
+      console.log(`\n\n\nPlayer name ${playerName} is already taken.\n\n\n`);
       return responder.respondWithError( "Name already taken.", 400);
     }
+
 
     const [clientWs, serverWs] = Object.values(new WebSocketPair());
     this.ctx.acceptWebSocket(serverWs, [playerName]);
 
-    return responder.respondWithWebSocket(clientWs);
+    console.log(`\n\n\nPlayer ${playerName} is joining the lobby.\n\n\n`);
+
+    try{
+      return responder.respondWithWebSocket(clientWs);
+    } catch (error) {
+      console.error(`Error responding with WebSocket for player ${playerName}:`, error);
+      return responder.respondWithError("Failed to establish WebSocket connection.", 500);
+    }
   }
 
   async webSocketMessage(ws: WebSocket, message: string) {

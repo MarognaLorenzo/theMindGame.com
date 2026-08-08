@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { SocketLobbyState, SocketMessage } from "../types";
 
-const DEFAULT_WORKER_URL = "http://127.0.0.1:8787";
+const DEFAULT_WORKER_URL = "http://127.0.0.1:8788";
 
 interface CreateLobbyResponse {
   lobbyId?: string;
@@ -209,6 +209,7 @@ export function useLobbyClient() {
 
     setStatus(options?.autoReconnect ? "Reconnecting to lobby..." : "Connecting to lobby...");
 
+    console.log('using websocket url: ', url.toString());
     const ws = new WebSocket(url.toString());
     wsRef.current = ws;
 
