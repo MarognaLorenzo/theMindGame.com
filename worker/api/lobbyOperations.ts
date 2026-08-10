@@ -39,7 +39,9 @@ export async function joinLobby(
         return responder.respondWithError(`Lobby with ID ${shortCode} not found`, 404);
       }
 
-      const lobbyStub = env.LOBBY_SERVER.get(env.LOBBY_SERVER.idFromString(lobbyDOId));
+        const lobbyStub = env.LOBBY_SERVER.get(env.LOBBY_SERVER.idFromString(lobbyDOId));
       console.log(`\n\n\nJoining lobby with ID ${shortCode} and name ${insertedName}\n\n\n`);
-      return await lobbyStub.playerFirstTimeAccess(insertedName, responder);
+        const res =  await lobbyStub.playerFirstTimeAccess(insertedName);
+        console.log(`\n\n\nResponse from playerFirstTimeAccess: ${res.status} ${res.statusText}\n\n\n`);
+        return res;
   }
