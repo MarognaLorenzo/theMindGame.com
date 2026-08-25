@@ -15,9 +15,14 @@ interface StoredLobbySession {
   playerId: string;
   playerName: string;
   resumeToken: string;
+  savedAt: number;
 }
 
 const SESSION_STORAGE_KEY = "mind-game:lobby-session";
+// The server drops a disconnected player (and their resume token) ~120s after their socket
+// closes, so a stored session older than that is already dead server-side. Give it a little
+// headroom over that grace period, then stop treating it as resumable.
+const SESSION_TTL_MS = 5 * 60 * 1000;
 
 function loadStoredSession(): StoredLobbySession | null {
   if (!window || !window.localStorage) {
@@ -35,8 +40,14 @@ function loadStoredSession(): StoredLobbySession | null {
       !parsed.lobbyId ||
       !parsed.playerId ||
       !parsed.playerName ||
-      !parsed.resumeToken
+      !parsed.resumeToken ||
+      !parsed.savedAt
     ) {
+      return null;
+    }
+
+    if (Date.now() - parsed.savedAt > SESSION_TTL_MS) {
+      clearSession();
       return null;
     }
 
@@ -45,17 +56,21 @@ function loadStoredSession(): StoredLobbySession | null {
       playerId: parsed.playerId,
       playerName: parsed.playerName,
       resumeToken: parsed.resumeToken,
+      savedAt: parsed.savedAt,
     };
   } catch {
     return null;
   }
 }
 
-function persistSession(session: StoredLobbySession) {
+function persistSession(session: Omit<StoredLobbySession, "savedAt">) {
   if (!window || !window.localStorage) {
     return;
   }
-  window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+  window.localStorage.setItem(
+    SESSION_STORAGE_KEY,
+    JSON.stringify({ ...session, savedAt: Date.now() }),
+  );
 }
 
 function clearSession() {
@@ -236,6 +251,7 @@ export function useLobbyClient() {
     wsRef.current = ws;
 
     ws.onopen = () => {
+      if (wsRef.current !== ws) return;
       reconnectAttemptsRef.current = 0;
       setIsConnected(true);
       setStatus(`Connected to lobby ${targetId}`);
@@ -248,6 +264,7 @@ export function useLobbyClient() {
     };
 
     ws.onmessage = (event) => {
+      if (wsRef.current !== ws) return;
       const incoming =
         typeof event.data === "string" ? event.data : "(binary data)";
       appendMessage(`Received: ${incoming}`);
@@ -301,24 +318,24 @@ export function useLobbyClient() {
     };
 
     ws.onerror = () => {
+      // A socket we've already superseded (e.g. the user started a new join while an old
+      // auto-reconnect attempt was still in flight) can still fire error/close after the fact.
+      // Only the socket we're still actively tracking may touch UI state.
+      if (wsRef.current !== ws) return;
       setError("Could not connect to lobby.");
       setStatus("Join failed");
       appendMessage("Socket error while joining lobby");
     };
 
     ws.onclose = () => {
+      if (wsRef.current !== ws) return;
+
+      wsRef.current = null;
       setIsConnected(false);
       setStatus("Disconnected");
       appendMessage("Socket closed");
 
-      const isCurrentSocket = wsRef.current === ws;
-      if (isCurrentSocket) {
-        wsRef.current = null;
-      }
-
-      // Only the socket we're still actively tracking is allowed to trigger a reconnect.
-      // A stale/replaced socket's close event should never schedule one.
-      if (isCurrentSocket && allowAutoReconnectRef.current) {
+      if (allowAutoReconnectRef.current) {
         scheduleReconnect();
       }
     };
