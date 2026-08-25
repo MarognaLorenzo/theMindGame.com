@@ -74,6 +74,7 @@ export class LobbyServer extends DurableObject {
 
   async playerFirstTimeAccess(playerName: string, resumeToken: string | null): Promise<Response> {
     await this.ensureLoaded();
+    await this.tokensManager.load();
     console.log(`\n\n\nPlayer ${playerName} is trying to join the lobby.\n\n\n`);
     if (!resumeToken && this.room.isPlayerNameInUse(playerName)) {
       console.log(`\n\n\nPlayer name ${playerName} is already taken.\n\n\n`);
@@ -112,6 +113,7 @@ export class LobbyServer extends DurableObject {
           }
         });
       }
+      this.pendingDisconnectionsManager.clearDisconnectDeadlineForPlayer(existingPlayer.id);
       thePlayer = existingPlayer;
     } else {
       thePlayer = this.room.createAddPlayer(playerName);
@@ -129,7 +131,7 @@ export class LobbyServer extends DurableObject {
 
     const response = new Response(null, { status: 101, webSocket: clientWs });
 
-    this.saveLobbyState();
+    await this.saveLobbyState();
     return response;
   }
 
@@ -160,7 +162,11 @@ export class LobbyServer extends DurableObject {
     await this.ensureLoaded();
 
     const leavingPlayerId = readPlayerAttachment(ws)?.playerId;
-    if (leavingPlayerId && !this.hasConnectedSocketForPlayer(leavingPlayerId, ws)) {
+    if (
+      leavingPlayerId &&
+      this.room.tryGetPlayerById(leavingPlayerId) &&
+      !this.hasConnectedSocketForPlayer(leavingPlayerId, ws)
+    ) {
       await this.pendingDisconnectionsManager.setDisconnectDeadlineForPlayer(leavingPlayerId);
       this.sendLobbyState();
     }

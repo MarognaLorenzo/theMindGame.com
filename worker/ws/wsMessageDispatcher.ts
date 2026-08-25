@@ -11,7 +11,7 @@ export async function dispatchWsMessage(ws: WebSocket, message: string, lobbySer
     const data = JSON.parse(message);
     switch (data.type) {
       case "JOIN":
-        const joinPlayerHandler = new JoinPlayerHandler(data.resumeToken, data.playerName);
+        const joinPlayerHandler = new JoinPlayerHandler();
         await joinPlayerHandler.handleMessage(ws, lobbyServer);
         break;
       case "START":

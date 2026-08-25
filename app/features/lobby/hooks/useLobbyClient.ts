@@ -223,14 +223,7 @@ export function useLobbyClient() {
       setLobbyId(targetId);
       setName(resolvedName);
 
-      const connectOptions = options? { resumeToken: options!.resumeToken!, playerName: resolvedName } : {};
-
-      ws.send(
-        JSON.stringify({
-          type: "JOIN",
-          ...(connectOptions),
-        }),
-      );
+      ws.send(JSON.stringify({ type: "JOIN" }));
       appendMessage(options?.resumeToken ? "Sent: JOIN (resume)" : "Sent: JOIN");
     };
 
