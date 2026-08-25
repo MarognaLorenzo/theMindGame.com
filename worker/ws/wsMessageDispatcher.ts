@@ -4,6 +4,7 @@ import { StartGameHandler } from "./handlers/startGameHandler.ts";
 import { PlayCardHandler } from "./handlers/playCardHandler.ts";
 import { UseShurikenHandler } from "./handlers/useShurikenHandler.ts";
 import { ExitGameHandler } from "./handlers/exitGameHandler.ts";
+import { LeaveLobbyHandler } from "./handlers/leaveLobbyHandler.ts";
 
 export async function dispatchWsMessage(ws: WebSocket, message: string, lobbyServer: LobbyServer) : Promise<void> {
     await lobbyServer.ensureLoaded();
@@ -29,6 +30,10 @@ export async function dispatchWsMessage(ws: WebSocket, message: string, lobbySer
       case "EXIT_GAME":
         const exitGameHandler = new ExitGameHandler();
         await exitGameHandler.handleMessage(ws, lobbyServer);
+        break;
+      case "LEAVE_LOBBY":
+        const leaveLobbyHandler = new LeaveLobbyHandler();
+        await leaveLobbyHandler.handleMessage(ws, lobbyServer);
         break;
       default:
         console.error("Unknown message type");
