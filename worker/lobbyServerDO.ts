@@ -75,9 +75,7 @@ export class LobbyServer extends DurableObject {
   async playerFirstTimeAccess(playerName: string, resumeToken: string | null): Promise<Response> {
     await this.ensureLoaded();
     await this.tokensManager.load();
-    console.log(`\n\n\nPlayer ${playerName} is trying to join the lobby.\n\n\n`);
     if (!resumeToken && this.room.isPlayerNameInUse(playerName)) {
-      console.log(`\n\n\nPlayer name ${playerName} is already taken.\n\n\n`);
       return new Response(JSON.stringify({ error: "Name already taken." }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
@@ -89,7 +87,6 @@ export class LobbyServer extends DurableObject {
     if (resumeToken) {
       const playerId = this.tokensManager.tryGetPlayerIdFromToken(resumeToken);
       if (!playerId) {
-        console.log(`\n\n\nInvalid resume token provided by player ${playerName} - token ${resumeToken} not found.\n\n\n`);
         return new Response(JSON.stringify({ error: "Invalid resume token." }), {
           status: 400,
           headers: { "Content-Type": "application/json" },
@@ -97,7 +94,6 @@ export class LobbyServer extends DurableObject {
       }
       const existingPlayer = this.room.tryGetPlayerById(playerId);
       if (!existingPlayer) {
-        console.log(`\n\n\nInvalid resume token provided by player ${playerName} - player not found.\n\n\n`);
         return new Response(JSON.stringify({ error: "Invalid resume token." }), {
           status: 400,
           headers: { "Content-Type": "application/json" },
@@ -106,7 +102,6 @@ export class LobbyServer extends DurableObject {
 
       // Check if the player already has a connected socket
       if (this.hasConnectedSocketForPlayer(existingPlayer.id)) {
-        console.log(`\n\n\nPlayer ${playerName} with ID ${existingPlayer.id} is already connected.\n\n\n`);
         this.ctx.getWebSockets().forEach((ws) => {
           if (readPlayerAttachment(ws)?.playerId === existingPlayer.id) {
             ws.close();
@@ -121,8 +116,6 @@ export class LobbyServer extends DurableObject {
 
     const [clientWs, serverWs] = Object.values(new WebSocketPair());
     this.ctx.acceptWebSocket(serverWs, [playerName]);
-
-    console.log(`\n\n\nPlayer ${playerName} is joining the lobby with websocket>: ${clientWs.url}.\n\n\n`);
 
     writePlayerAttachment(serverWs, {
       playerId: thePlayer.id,

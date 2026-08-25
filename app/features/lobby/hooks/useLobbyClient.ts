@@ -246,7 +246,6 @@ export function useLobbyClient() {
 
     setStatus(options?.autoReconnect ? "Reconnecting to lobby..." : "Connecting to lobby...");
 
-    console.log('using websocket url: ', url.toString());
     const ws = new WebSocket(url.toString());
     wsRef.current = ws;
 

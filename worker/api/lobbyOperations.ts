@@ -40,7 +40,6 @@ export async function joinLobby(
       }
 
         const lobbyStub = env.LOBBY_SERVER.get(env.LOBBY_SERVER.idFromString(lobbyDOId));
-      console.log(`\n\n\nJoining lobby with ID ${shortCode} and name ${insertedName}\n\n\n`);
 
       return await lobbyStub.fetch(request);
   }

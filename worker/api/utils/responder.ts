@@ -35,7 +35,6 @@ export class Responder {
   }
 
   public respondWithWebSocket(webSocket: WebSocket): Response {
-    console.log("Responding with WebSocket");
     return new Response(null, { status: 101, webSocket });
   }
 }
