@@ -7,19 +7,24 @@ import { Player } from "@/worker/game/player.ts";
 export class JoinPlayerHandler extends WsMessageHandler {
     type: "JOIN" = "JOIN";
     resumeToken?: string;
-    constructor(resumeToken?: string) {
+    playerName?: string;
+    constructor(resumeToken?: string, playerName?: string) {
         super();
         this.resumeToken = resumeToken;
+        this.playerName = playerName;
     }
     handleMessage = async (ws: WebSocket, lobbyServer: LobbyServer) => {
-        lobbyServer.tokensManager.load();
+        await lobbyServer.tokensManager.load();
         const wsAttachment = analyzeAttachment(ws);
 
         // If the joining player already has a valid attachment, it means they are reconnecting and we can send them the JOINED message directly.
         if (wsAttachment.isValid) {
         const newUserToken = lobbyServer.tokensManager.assignNewTokenToPlayer(wsAttachment.playerId??"");
         await lobbyServer.tokensManager.storeMap();
-        wsSendJoined(ws, wsAttachment.playerId??"", wsAttachment.playerName??"", newUserToken);
+        console.log(`socket + attachment\n`);
+        wsSendJoined(ws, wsAttachment.playerId!, wsAttachment.playerName!, newUserToken);
+        await lobbyServer.saveLobbyState();
+        lobbyServer.sendLobbyState();
         return;
         }
 
@@ -48,9 +53,11 @@ export class JoinPlayerHandler extends WsMessageHandler {
 
             // Initialize the resume token for this player with a new one
             const newUserToken = lobbyServer.tokensManager.assignNewTokenToPlayer(maybePlayer.id);
-            lobbyServer.tokensManager.storeMap();
+            await lobbyServer.tokensManager.storeMap();
 
             wsSendJoined(ws, maybePlayer.id, maybePlayer.name, newUserToken);
+            await lobbyServer.saveLobbyState();
+            lobbyServer.sendLobbyState();
             return;
             }
             wsSendError(ws, "A player with this resume token is already connected. Reconnect from that session instead.");
@@ -60,7 +67,25 @@ export class JoinPlayerHandler extends WsMessageHandler {
             return;
         }
         }
-        // no resume token and no attachment, should not be able to join
-        wsSendError(ws, "No resume token provided. Please join the lobby again.");
+        // no resume token and no attachment, playerName should be passed so that we can create a new player and assign it to the socket.
+        if (!this.playerName) {
+            wsSendError(ws, "No player name provided. Please join the lobby again.");
+            return;
+        }
+
+        const createdPlayer = lobbyServer.room.createAddPlayer(this.playerName);
+        writePlayerAttachment(ws, {
+            playerId: createdPlayer.id,
+            playerName: createdPlayer.name,
+        });
+
+        const newUserToken = lobbyServer.tokensManager.assignNewTokenToPlayer(createdPlayer.id);
+        await lobbyServer.tokensManager.storeMap();
+        console.log(`socket + new player: storing token ${newUserToken} for playerId ${createdPlayer.id}\n`);
+
+        wsSendJoined(ws, createdPlayer.id, createdPlayer.name, newUserToken);
+        await lobbyServer.saveLobbyState();
+        lobbyServer.sendLobbyState();
+        return;
     }
 };

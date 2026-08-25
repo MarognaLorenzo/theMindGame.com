@@ -41,7 +41,6 @@ export async function joinLobby(
 
         const lobbyStub = env.LOBBY_SERVER.get(env.LOBBY_SERVER.idFromString(lobbyDOId));
       console.log(`\n\n\nJoining lobby with ID ${shortCode} and name ${insertedName}\n\n\n`);
-        const res =  await lobbyStub.playerFirstTimeAccess(insertedName);
-        console.log(`\n\n\nResponse from playerFirstTimeAccess: ${res.status} ${res.statusText}\n\n\n`);
-        return res;
+
+      return await lobbyStub.fetch(request);
   }

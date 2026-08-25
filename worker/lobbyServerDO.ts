@@ -1,9 +1,10 @@
 import { DurableObject } from "cloudflare:workers";
-import { addMissingPlayersFromSockets, filterPlayersWithoutSockets, readPlayerAttachment } from "./ws/wsUtils.ts";
+import { addMissingPlayersFromSockets, filterPlayersWithoutSockets, readPlayerAttachment, writePlayerAttachment } from "./ws/wsUtils.ts";
 import { dispatchWsMessage } from "./ws/wsMessageDispatcher.ts";
 import { createEmptyRoom, hydrateRoom, Room } from "./game/room.ts";
 import { ResumeTokenManager } from "./connections/resumeTokens.ts";
 import {PendingDisconnectionsManager} from "./connections/pendingDisconnections.ts";
+import { Player } from "./game/player.ts";
 
 export class LobbyServer extends DurableObject {
   private initialized = false;
@@ -17,6 +18,18 @@ export class LobbyServer extends DurableObject {
   // To ensure that the lobby state is loaded before any operations, we check if it's initialized.
   // If not, we load the state from storage and reconcile the players with the connected WebSockets.
   // Then we set initialize to true and save the lobby state back to storage.
+
+  public async fetch(request: Request): Promise<Response> {
+    const url = new URL(request.url);
+     if(url.pathname !== "/api/join") {
+      return new Response("Invalid path for LobbyServer fetch", { status: 404 });
+    }
+    // Fetch is only used for the first time a player joins the lobby, to get the WebSocket connection.
+    // Using RPC connection is not possible because web sockets are not serializable and cannot be passed through RPC.
+    const playerName = url.searchParams.get("name");
+    const resumeToken = url.searchParams.get("resumeToken");
+    return this.playerFirstTimeAccess(playerName!, resumeToken);
+  }
 
   public async ensureLoaded() {
     if (this.initialized) {
@@ -59,10 +72,10 @@ export class LobbyServer extends DurableObject {
       this.room.restoreHostPlayerId();
   }
 
-  async playerFirstTimeAccess(playerName: string): Promise<Response> {
+  async playerFirstTimeAccess(playerName: string, resumeToken: string | null): Promise<Response> {
     await this.ensureLoaded();
     console.log(`\n\n\nPlayer ${playerName} is trying to join the lobby.\n\n\n`);
-    if (this.room.isPlayerNameInUse(playerName)) {
+    if (!resumeToken && this.room.isPlayerNameInUse(playerName)) {
       console.log(`\n\n\nPlayer name ${playerName} is already taken.\n\n\n`);
       return new Response(JSON.stringify({ error: "Name already taken." }), {
         status: 400,
@@ -70,13 +83,54 @@ export class LobbyServer extends DurableObject {
       });
     }
 
+    let thePlayer: Player;
+
+    if (resumeToken) {
+      const playerId = this.tokensManager.tryGetPlayerIdFromToken(resumeToken);
+      if (!playerId) {
+        console.log(`\n\n\nInvalid resume token provided by player ${playerName} - token ${resumeToken} not found.\n\n\n`);
+        return new Response(JSON.stringify({ error: "Invalid resume token." }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      const existingPlayer = this.room.tryGetPlayerById(playerId);
+      if (!existingPlayer) {
+        console.log(`\n\n\nInvalid resume token provided by player ${playerName} - player not found.\n\n\n`);
+        return new Response(JSON.stringify({ error: "Invalid resume token." }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      // Check if the player already has a connected socket
+      if (this.hasConnectedSocketForPlayer(existingPlayer.id)) {
+        console.log(`\n\n\nPlayer ${playerName} with ID ${existingPlayer.id} is already connected.\n\n\n`);
+        this.ctx.getWebSockets().forEach((ws) => {
+          if (readPlayerAttachment(ws)?.playerId === existingPlayer.id) {
+            ws.close();
+          }
+        });
+      }
+      thePlayer = existingPlayer;
+    } else {
+      thePlayer = this.room.createAddPlayer(playerName);
+    }
 
     const [clientWs, serverWs] = Object.values(new WebSocketPair());
     this.ctx.acceptWebSocket(serverWs, [playerName]);
 
     console.log(`\n\n\nPlayer ${playerName} is joining the lobby with websocket>: ${clientWs.url}.\n\n\n`);
 
-    return new Response(null, { status: 101, webSocket: clientWs });
+    writePlayerAttachment(clientWs, {
+      playerId: thePlayer.id,
+      playerName: thePlayer.name
+    });
+
+    const response = new Response(null, { status: 101, webSocket: clientWs });
+
+    this.saveLobbyState();
+    return response;
   }
 
   async webSocketMessage(ws: WebSocket, message: string) {

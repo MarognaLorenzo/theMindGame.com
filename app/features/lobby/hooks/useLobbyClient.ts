@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { SocketLobbyState, SocketMessage } from "../types";
 
-const DEFAULT_WORKER_URL = "http://127.0.0.1:8788";
+const DEFAULT_WORKER_URL = "http://127.0.0.1:8787";
 
 interface CreateLobbyResponse {
   lobbyId?: string;
@@ -19,7 +19,7 @@ interface StoredLobbySession {
 const SESSION_STORAGE_KEY = "mind-game:lobby-session";
 
 function loadStoredSession(): StoredLobbySession | null {
-  if (typeof window === "undefined") {
+  if (!window || !window.localStorage) {
     return null;
   }
 
@@ -51,14 +51,14 @@ function loadStoredSession(): StoredLobbySession | null {
 }
 
 function persistSession(session: StoredLobbySession) {
-  if (typeof window === "undefined") {
+  if (!window || !window.localStorage) {
     return;
   }
   window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
 }
 
 function clearSession() {
-  if (typeof window === "undefined") {
+  if (!window || !window.localStorage) {
     return;
   }
   window.localStorage.removeItem(SESSION_STORAGE_KEY);
@@ -67,7 +67,7 @@ function clearSession() {
 function getStoredSessionForLobby(
   targetLobbyId: string,
   playerName: string,
-): StoredLobbySession | null {
+): StoredLobbySession | null { 
   const session = loadStoredSession();
   if (!session) {
     return null;
@@ -206,6 +206,9 @@ export function useLobbyClient() {
     const url = new URL(`${wsBaseUrl}/api/join`);
     url.searchParams.set("lobbyId", targetId);
     url.searchParams.set("name", resolvedName);
+    if(options?.resumeToken) {
+      url.searchParams.set("resumeToken", options.resumeToken);
+    }
 
     setStatus(options?.autoReconnect ? "Reconnecting to lobby..." : "Connecting to lobby...");
 
@@ -220,10 +223,12 @@ export function useLobbyClient() {
       setLobbyId(targetId);
       setName(resolvedName);
 
+      const connectOptions = options? { resumeToken: options!.resumeToken!, playerName: resolvedName } : {};
+
       ws.send(
         JSON.stringify({
           type: "JOIN",
-          ...(options?.resumeToken ? { resumeToken: options.resumeToken } : {}),
+          ...(connectOptions),
         }),
       );
       appendMessage(options?.resumeToken ? "Sent: JOIN (resume)" : "Sent: JOIN");
@@ -233,6 +238,7 @@ export function useLobbyClient() {
       const incoming =
         typeof event.data === "string" ? event.data : "(binary data)";
       appendMessage(`Received: ${incoming}`);
+      setIsConnected(true);
 
       if (typeof event.data !== "string") {
         return;
@@ -242,6 +248,7 @@ export function useLobbyClient() {
         const data = JSON.parse(event.data) as SocketMessage;
 
         if (data.type === "JOINED") {
+          setError("");
           setMyPlayerId(data.playerId);
 
           if (data.resumeToken) {
@@ -252,9 +259,14 @@ export function useLobbyClient() {
               resumeToken: data.resumeToken,
             });
           }
+
+          if (data.playerId) {
+            appendMessage(`Joined lobby as player ${data.playerName} (ID: ${data.playerId})`);
+          }
         }
 
         if (data.type === "LOBBY_STATE") {
+          setError("");
           setLobby(data.lobby);
         }
 
@@ -285,11 +297,15 @@ export function useLobbyClient() {
       setIsConnected(false);
       setStatus("Disconnected");
       appendMessage("Socket closed");
-      if (wsRef.current === ws) {
+
+      const isCurrentSocket = wsRef.current === ws;
+      if (isCurrentSocket) {
         wsRef.current = null;
       }
 
-      if (allowAutoReconnectRef.current) {
+      // Only the socket we're still actively tracking is allowed to trigger a reconnect.
+      // A stale/replaced socket's close event should never schedule one.
+      if (isCurrentSocket && allowAutoReconnectRef.current) {
         scheduleReconnect();
       }
     };
@@ -319,7 +335,7 @@ export function useLobbyClient() {
       setLobbyId(data.lobbyId);
       setStatus(`Lobby created: ${data.lobbyId}. Joining...`);
       appendMessage(`Lobby created: ${data.lobbyId}`);
-      connectToLobby(data.lobbyId);
+      connectToLobby(data.lobbyId, { playerNameOverride: name.trim() });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";
       setError(message);
