@@ -122,7 +122,7 @@ export class LobbyServer extends DurableObject {
 
     console.log(`\n\n\nPlayer ${playerName} is joining the lobby with websocket>: ${clientWs.url}.\n\n\n`);
 
-    writePlayerAttachment(clientWs, {
+    writePlayerAttachment(serverWs, {
       playerId: thePlayer.id,
       playerName: thePlayer.name
     });
