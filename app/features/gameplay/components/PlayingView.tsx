@@ -371,9 +371,14 @@ export function PlayingView({
 
       <div className="mt-auto pb-2">
 
-        <div className="mt-4 flex justify-center overflow-x-auto px-2 pb-2">
+        <div className="mt-4 overflow-x-auto px-2 pb-2">
           {sortedHand.length ? (
-            <div className="isolate flex items-end py-1">
+            // Centering via margin-inline: auto (rather than a flex justify-center on the
+            // scrollable ancestor) keeps the row centered while it fits, but lets it collapse
+            // to the start edge once it overflows - so the lowest card (index 0, the one a
+            // player almost always wants) stays reachable at scrollLeft: 0 instead of being
+            // pushed off to a negative offset most browsers won't scroll back to.
+            <div className="isolate mx-auto flex w-fit items-end py-1">
               {sortedHand.map((card, index) => {
                 const tilt = (index % 2 === 0 ? -1 : 1) * Math.min(index, tiltCap);
 
@@ -403,7 +408,7 @@ export function PlayingView({
               })}
             </div>
           ) : (
-            <p className="px-1 text-sm text-[var(--text-muted)]">No cards in hand.</p>
+            <p className="px-1 text-center text-sm text-[var(--text-muted)]">No cards in hand.</p>
           )}
         </div>
       </div>
