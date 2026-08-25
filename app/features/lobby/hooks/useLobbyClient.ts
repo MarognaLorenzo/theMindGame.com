@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { SocketLobbyState, SocketMessage } from "../types";
 
 const DEFAULT_WORKER_URL = "http://127.0.0.1:8787";
+const MAX_RECONNECT_ATTEMPTS = 5;
 
 interface CreateLobbyResponse {
   lobbyId?: string;
@@ -109,6 +110,7 @@ export function useLobbyClient() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
   const allowAutoReconnectRef = useRef(true);
+  const reconnectAttemptsRef = useRef(0);
 
   const workerBaseUrl =
     process.env.NEXT_PUBLIC_WORKER_URL?.trim() || DEFAULT_WORKER_URL;
@@ -171,6 +173,20 @@ export function useLobbyClient() {
       return;
     }
 
+    // A failed WebSocket handshake (e.g. an expired resume token rejected before the upgrade)
+    // surfaces to the browser as a bare close/error with no readable reason, so we can't tell a
+    // dead session apart from a transient network blip. Cap the attempts so a dead session
+    // doesn't retry forever instead of trying to interpret the failure.
+    reconnectAttemptsRef.current += 1;
+    if (reconnectAttemptsRef.current > MAX_RECONNECT_ATTEMPTS) {
+      reconnectAttemptsRef.current = 0;
+      clearSession();
+      setStatus("Ready");
+      setError("Could not restore your previous session. Please join again.");
+      appendMessage("Giving up on reconnecting after repeated failures.");
+      return;
+    }
+
     reconnectTimerRef.current = window.setTimeout(() => {
       connectToLobby(session.lobbyId, {
         resumeToken: session.resumeToken,
@@ -202,6 +218,9 @@ export function useLobbyClient() {
       clearLobbyState: false,
     });
     allowAutoReconnectRef.current = true;
+    if (!options?.autoReconnect) {
+      reconnectAttemptsRef.current = 0;
+    }
 
     const url = new URL(`${wsBaseUrl}/api/join`);
     url.searchParams.set("lobbyId", targetId);
@@ -217,6 +236,7 @@ export function useLobbyClient() {
     wsRef.current = ws;
 
     ws.onopen = () => {
+      reconnectAttemptsRef.current = 0;
       setIsConnected(true);
       setStatus(`Connected to lobby ${targetId}`);
       appendMessage(`Connected to lobby ${targetId}`);
