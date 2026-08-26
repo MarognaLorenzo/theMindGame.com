@@ -43,3 +43,11 @@ export type SocketMessage =
   | SocketLobbyStateMessage
   | SocketErrorMessage
   | SocketGameAbortedMessage;
+
+export type ClientMessage =
+  | { type: "JOIN" }
+  | { type: "START" }
+  | { type: "PLAY_CARD"; card: number }
+  | { type: "USE_SHURIKEN" }
+  | { type: "EXIT_GAME" }
+  | { type: "LEAVE_LOBBY" };
