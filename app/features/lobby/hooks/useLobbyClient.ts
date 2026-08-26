@@ -117,7 +117,6 @@ export function useLobbyClient() {
   const [lobbyId, setLobbyId] = useState("");
   const [status, setStatus] = useState("Ready");
   const [error, setError] = useState("");
-  const [messages, setMessages] = useState<string[]>([]);
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
   const [lobby, setLobby] = useState<SocketLobbyState | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -139,15 +138,6 @@ export function useLobbyClient() {
     }
     return workerBaseUrl;
   }, [workerBaseUrl]);
-
-  function appendMessage(line: string) {
-    const timestamp = new Date().toLocaleTimeString();
-    setMessages((prev) => [`[${timestamp}] ${line}`, ...prev].slice(0, 50));
-  }
-
-  function clearMessages() {
-    setMessages([]);
-  }
 
   function clearReconnectTimer() {
     if (reconnectTimerRef.current !== null) {
@@ -198,7 +188,6 @@ export function useLobbyClient() {
       clearSession();
       setStatus("Ready");
       setError("Could not restore your previous session. Please join again.");
-      appendMessage("Giving up on reconnecting after repeated failures.");
       return;
     }
 
@@ -254,19 +243,14 @@ export function useLobbyClient() {
       reconnectAttemptsRef.current = 0;
       setIsConnected(true);
       setStatus(`Connected to lobby ${targetId}`);
-      appendMessage(`Connected to lobby ${targetId}`);
       setLobbyId(targetId);
       setName(resolvedName);
 
       ws.send(JSON.stringify({ type: "JOIN" }));
-      appendMessage(options?.resumeToken ? "Sent: JOIN (resume)" : "Sent: JOIN");
     };
 
     ws.onmessage = (event) => {
       if (wsRef.current !== ws) return;
-      const incoming =
-        typeof event.data === "string" ? event.data : "(binary data)";
-      appendMessage(`Received: ${incoming}`);
       setIsConnected(true);
 
       if (typeof event.data !== "string") {
@@ -287,10 +271,6 @@ export function useLobbyClient() {
               playerName: data.playerName,
               resumeToken: data.resumeToken,
             });
-          }
-
-          if (data.playerId) {
-            appendMessage(`Joined lobby as player ${data.playerName} (ID: ${data.playerId})`);
           }
         }
 
@@ -323,7 +303,6 @@ export function useLobbyClient() {
       if (wsRef.current !== ws) return;
       setError("Could not connect to lobby.");
       setStatus("Join failed");
-      appendMessage("Socket error while joining lobby");
     };
 
     ws.onclose = () => {
@@ -332,7 +311,6 @@ export function useLobbyClient() {
       wsRef.current = null;
       setIsConnected(false);
       setStatus("Disconnected");
-      appendMessage("Socket closed");
 
       if (allowAutoReconnectRef.current) {
         scheduleReconnect();
@@ -363,13 +341,11 @@ export function useLobbyClient() {
 
       setLobbyId(data.lobbyId);
       setStatus(`Lobby created: ${data.lobbyId}. Joining...`);
-      appendMessage(`Lobby created: ${data.lobbyId}`);
       connectToLobby(data.lobbyId, { playerNameOverride: name.trim() });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";
       setError(message);
       setStatus("Create failed");
-      appendMessage(`Create failed: ${message}`);
     }
   }
 
@@ -396,19 +372,16 @@ export function useLobbyClient() {
   function startGame() {
     if (!validConnection()) return;
     wsRef?.current?.send(JSON.stringify({ type: "START" }));
-    appendMessage("Sent: START");
   }
 
   function onCardPlay(card: number) {
     if (!validConnection()) return;
     wsRef?.current?.send(JSON.stringify({ type: "PLAY_CARD", card }));
-    appendMessage(`Sent: PLAY_CARD ${card}`);
   }
 
   function onShurikenUse() {
     if (!validConnection()) return;
     wsRef?.current?.send(JSON.stringify({ type: "USE_SHURIKEN" }));
-    appendMessage("Sent: USE_SHURIKEN");
   }
 
   function exitGame() {
@@ -418,7 +391,6 @@ export function useLobbyClient() {
     }
 
     wsRef.current?.send(JSON.stringify({ type: "EXIT_GAME" }));
-    appendMessage("Sent: EXIT_GAME");
     disconnectSocket({ clearStoredSession: true, allowReconnect: false });
   }
 
@@ -434,7 +406,6 @@ export function useLobbyClient() {
     clearSession();
 
     wsRef.current?.send(JSON.stringify({ type: "LEAVE_LOBBY" }));
-    appendMessage("Sent: LEAVE_LOBBY");
     setStatus("Leaving lobby...");
 
     // Fallback: if close event does not arrive, force local cleanup.
@@ -476,7 +447,6 @@ export function useLobbyClient() {
     setLobbyId,
     status,
     error,
-    messages,
     myPlayerId,
     lobby,
     isConnected,
@@ -486,7 +456,6 @@ export function useLobbyClient() {
     joinLobby,
     disconnectSocket,
     startGame,
-    clearMessages,
     onCardPlay,
     onShurikenUse,
     exitGame,
