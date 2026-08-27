@@ -124,12 +124,12 @@ function renderPage(body: string): string {
 </head><body><div class="card">${body}</div></body></html>`;
 }
 
-interface ApproveRequestParams {
+interface ReviewRequestParams {
   id: number;
   key: string;
 }
 
-function parseApproveParams(url: URL, env: Env, responder: Responder): ApproveRequestParams | Response {
+function parseReviewParams(url: URL, env: Env, responder: Responder): ReviewRequestParams | Response {
   const idParam = url.searchParams.get("id");
   const key = url.searchParams.get("key");
 
@@ -147,14 +147,23 @@ function parseApproveParams(url: URL, env: Env, responder: Responder): ApproveRe
   return { id, key };
 }
 
-// GET /api/leaderboard/approve?id&key - read-only confirmation page.
-export async function renderApproveConfirmation(
+// A pending row can only ever resolve to one of these two terminal states.
+const REVIEW_OUTCOME_LABELS: Record<string, string> = {
+  approved: "✅ approved",
+  rejected: "🚫 rejected",
+};
+
+// GET /api/leaderboard/review?id&key - read-only confirmation page, offering
+// both actions. Never mutates on its own - a chat client's link-preview
+// crawler pre-fetching this URL must not silently approve/deny anything -
+// each button's form POSTs back to actually flip the status.
+export async function renderReviewConfirmation(
   request: Request,
   env: Env,
   responder: Responder,
 ): Promise<Response> {
   const url = new URL(request.url);
-  const params = parseApproveParams(url, env, responder);
+  const params = parseReviewParams(url, env, responder);
   if (params instanceof Response) {
     return params;
   }
@@ -175,48 +184,66 @@ export async function renderApproveConfirmation(
     return responder.respondWithHtml(renderPage(`<p>No leaderboard entry with id ${params.id}.</p>`), 404);
   }
 
-  if (row.status === "approved") {
+  const outcomeLabel = REVIEW_OUTCOME_LABELS[row.status];
+  if (outcomeLabel) {
     return responder.respondWithHtml(
-      renderPage(`<p>✅ "${escapeHtml(row.team_name)}" is already approved.</p>`),
+      renderPage(`<p>"${escapeHtml(row.team_name)}" was already ${outcomeLabel}.</p>`),
     );
   }
 
-  const actionUrl = `/api/leaderboard/approve?id=${params.id}&key=${encodeURIComponent(params.key)}`;
+  const query = `id=${params.id}&key=${encodeURIComponent(params.key)}`;
   return responder.respondWithHtml(
     renderPage(`
-      <p>Approve this leaderboard entry?</p>
+      <p>Review this leaderboard entry:</p>
       <p><strong>${escapeHtml(row.team_name)}</strong> (${escapeHtml(row.country_code)})<br>
       ${row.player_count} players · ${row.final_seconds.toFixed(1)}s</p>
-      <form method="POST" action="${actionUrl}">
-        <button type="submit">Approve</button>
-      </form>
+      <div style="display:flex;gap:0.75rem;justify-content:center;flex-wrap:wrap;">
+        <form method="POST" action="/api/leaderboard/approve?${query}">
+          <button type="submit">Approve</button>
+        </form>
+        <form method="POST" action="/api/leaderboard/deny?${query}">
+          <button type="submit" style="background:#f08f8f;">Deny</button>
+        </form>
+      </div>
     `),
   );
 }
 
-// POST /api/leaderboard/approve?id&key - the actual mutation.
-export async function approveLeaderboardEntry(
+async function resolveReview(
   request: Request,
   env: Env,
   responder: Responder,
+  targetStatus: "approved" | "rejected",
 ): Promise<Response> {
   const url = new URL(request.url);
-  const params = parseApproveParams(url, env, responder);
+  const params = parseReviewParams(url, env, responder);
   if (params instanceof Response) {
     return params;
   }
 
   const result = await env.DB.prepare(
-    "UPDATE leaderboard SET status = 'approved' WHERE id = ? AND status = 'pending'",
+    "UPDATE leaderboard SET status = ? WHERE id = ? AND status = 'pending'",
   )
-    .bind(params.id)
+    .bind(targetStatus, params.id)
     .run();
 
   if (result.meta.changes === 0) {
     return responder.respondWithHtml(
-      renderPage(`<p>Nothing to do - entry ${params.id} was not pending (already approved, or doesn't exist).</p>`),
+      renderPage(`<p>Nothing to do - entry ${params.id} was not pending (already reviewed, or doesn't exist).</p>`),
     );
   }
 
-  return responder.respondWithHtml(renderPage(`<p>✅ Approved entry ${params.id}.</p>`));
+  return responder.respondWithHtml(
+    renderPage(`<p>${REVIEW_OUTCOME_LABELS[targetStatus]} entry ${params.id}.</p>`),
+  );
+}
+
+// POST /api/leaderboard/approve?id&key - the actual mutation.
+export function approveLeaderboardEntry(request: Request, env: Env, responder: Responder): Promise<Response> {
+  return resolveReview(request, env, responder, "approved");
+}
+
+// POST /api/leaderboard/deny?id&key - the actual mutation.
+export function denyLeaderboardEntry(request: Request, env: Env, responder: Responder): Promise<Response> {
+  return resolveReview(request, env, responder, "rejected");
 }

@@ -3,9 +3,10 @@ import { LobbyRegistry } from "./lobbyRegistryDO.ts";
 import { createLobby, joinLobby } from "./api/lobbyOperations.ts";
 import {
   getLeaderboard,
-  renderApproveConfirmation,
+  renderReviewConfirmation,
   submitLeaderboardEntry,
   approveLeaderboardEntry,
+  denyLeaderboardEntry,
 } from "./api/leaderboard/leaderboardOperations.ts";
 import { Responder } from "./api/utils/responder.ts";
 
@@ -57,12 +58,16 @@ const worker = {
         return await getLeaderboard(request, env, responder);
       }
 
-      if (path === "/api/leaderboard/approve" && request.method === "GET") {
-        return await renderApproveConfirmation(request, env, responder);
+      if (path === "/api/leaderboard/review" && request.method === "GET") {
+        return await renderReviewConfirmation(request, env, responder);
       }
 
       if (path === "/api/leaderboard/approve" && request.method === "POST") {
         return await approveLeaderboardEntry(request, env, responder);
+      }
+
+      if (path === "/api/leaderboard/deny" && request.method === "POST") {
+        return await denyLeaderboardEntry(request, env, responder);
       }
       return responder.respondWithError("Not Found", 404);
     } catch (err) {

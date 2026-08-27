@@ -31,9 +31,11 @@ export async function notifyPendingSubmission(
   const actionLine =
     publicBaseUrl && approvalKey
       ? // Wrapped in <> so Discord's own link-preview crawler doesn't pre-fetch
-        // (and thereby land on, though not mutate - GET is confirm-only) it.
-        `Approve: <${publicBaseUrl}/api/leaderboard/approve?id=${entry.id}&key=${encodeURIComponent(approvalKey)}>`
-      : `Approve: \`UPDATE leaderboard SET status='approved' WHERE id=${entry.id};\``;
+        // (and thereby land on, though not mutate - GET is confirm-only, with
+        // both approve/deny as explicit buttons on that page) it.
+        `Review: <${publicBaseUrl}/api/leaderboard/review?id=${entry.id}&key=${encodeURIComponent(approvalKey)}>`
+      : `Approve: \`UPDATE leaderboard SET status='approved' WHERE id=${entry.id};\` ` +
+        `/ Deny: \`UPDATE leaderboard SET status='rejected' WHERE id=${entry.id};\``;
 
   const content =
     `🔔 New leaderboard submission needs review\n` +
