@@ -44,4 +44,15 @@ export class Responder {
   public respondWithWebSocket(webSocket: WebSocket): Response {
     return new Response(null, { status: 101, webSocket });
   }
+
+  public respondWithHtml(html: string, status: number = 200): Response {
+    return withCors(
+      new Response(html, {
+        status,
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      }),
+      this.request,
+      this.env,
+    );
+  }
 }

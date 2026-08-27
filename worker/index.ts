@@ -3,7 +3,9 @@ import { LobbyRegistry } from "./lobbyRegistryDO.ts";
 import { createLobby, joinLobby } from "./api/lobbyOperations.ts";
 import {
   getLeaderboard,
+  renderApproveConfirmation,
   submitLeaderboardEntry,
+  approveLeaderboardEntry,
 } from "./api/leaderboard/leaderboardOperations.ts";
 import { Responder } from "./api/utils/responder.ts";
 
@@ -13,6 +15,11 @@ export interface Env {
   DB: D1Database;
   ALLOWED_ORIGINS?: string;
   DISCORD_WEBHOOK_URL?: string;
+  // Base URL this Worker is reachable at (used to build the one-click approve
+  // link in the review notification) and the capability key that link's
+  // request must present. Both undefined => notifications skip the link.
+  PUBLIC_BASE_URL?: string;
+  REVIEW_APPROVAL_KEY?: string;
 }
 
 const REGISTRY_OBJECT_NAME = "global-registry";
@@ -48,6 +55,14 @@ const worker = {
 
       if (path === "/api/leaderboard" && request.method === "GET") {
         return await getLeaderboard(request, env, responder);
+      }
+
+      if (path === "/api/leaderboard/approve" && request.method === "GET") {
+        return await renderApproveConfirmation(request, env, responder);
+      }
+
+      if (path === "/api/leaderboard/approve" && request.method === "POST") {
+        return await approveLeaderboardEntry(request, env, responder);
       }
       return responder.respondWithError("Not Found", 404);
     } catch (err) {

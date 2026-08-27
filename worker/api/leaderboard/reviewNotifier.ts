@@ -11,18 +11,34 @@ interface PendingSubmissionNotice {
   finalSeconds: number;
 }
 
+export interface ReviewNotifierConfig {
+  webhookUrl: string | undefined;
+  // Both required to include the one-click approve link; either missing
+  // falls back to a raw SQL statement so review is still possible.
+  publicBaseUrl: string | undefined;
+  approvalKey: string | undefined;
+}
+
 export async function notifyPendingSubmission(
-  webhookUrl: string | undefined,
+  config: ReviewNotifierConfig,
   entry: PendingSubmissionNotice,
 ): Promise<void> {
+  const { webhookUrl, publicBaseUrl, approvalKey } = config;
   if (!webhookUrl) {
     return;
   }
 
+  const actionLine =
+    publicBaseUrl && approvalKey
+      ? // Wrapped in <> so Discord's own link-preview crawler doesn't pre-fetch
+        // (and thereby land on, though not mutate - GET is confirm-only) it.
+        `Approve: <${publicBaseUrl}/api/leaderboard/approve?id=${entry.id}&key=${encodeURIComponent(approvalKey)}>`
+      : `Approve: \`UPDATE leaderboard SET status='approved' WHERE id=${entry.id};\``;
+
   const content =
     `🔔 New leaderboard submission needs review\n` +
     `**${entry.teamName}** (${entry.countryCode}) - ${entry.playerCount} players, ${entry.finalSeconds.toFixed(1)}s\n` +
-    `Approve: \`UPDATE leaderboard SET status='approved' WHERE id=${entry.id};\``;
+    actionLine;
 
   try {
     const response = await fetch(webhookUrl, {

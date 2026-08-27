@@ -225,13 +225,20 @@ export class LobbyServer extends DurableObject<Env> {
       )
       .run();
 
-    await notifyPendingSubmission(this.env.DISCORD_WEBHOOK_URL, {
-      id: insertResult.meta.last_row_id,
-      teamName: cleanName,
-      countryCode: cleanCountry,
-      playerCount,
-      finalSeconds,
-    });
+    await notifyPendingSubmission(
+      {
+        webhookUrl: this.env.DISCORD_WEBHOOK_URL,
+        publicBaseUrl: this.env.PUBLIC_BASE_URL,
+        approvalKey: this.env.REVIEW_APPROVAL_KEY,
+      },
+      {
+        id: insertResult.meta.last_row_id,
+        teamName: cleanName,
+        countryCode: cleanCountry,
+        playerCount,
+        finalSeconds,
+      },
+    );
 
     return { ok: true };
   }

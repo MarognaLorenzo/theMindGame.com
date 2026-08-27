@@ -26,6 +26,7 @@ migrations_dir = "migrations"
 
 [vars]
 ALLOWED_ORIGINS = "https://themindgameonline3-0-pages.pages.dev,http://localhost:3000,https://the-mind-game.com,*.themindgameonline3-0-pages.pages.dev"
+PUBLIC_BASE_URL = "https://the-mind-game-worker.lmarogna02.workers.dev"
 
 # Isolated preview deployment: Workers Preview URLs don't support Durable
 # Objects, so this is the workaround - a separate, distinctly-named Worker
@@ -61,3 +62,4 @@ migrations_dir = "migrations"
 
 [env.preview.vars]
 ALLOWED_ORIGINS = "https://themindgameonline3-0-pages.pages.dev,http://localhost:3000,https://the-mind-game.com,*.themindgameonline3-0-pages.pages.dev"
+PUBLIC_BASE_URL = "https://the-mind-game-worker-preview.lmarogna02.workers.dev"
