@@ -5,8 +5,17 @@ import { createEmptyRoom, hydrateRoom, Room } from "./game/room.ts";
 import { ResumeTokenManager } from "./connections/resumeTokens.ts";
 import {PendingDisconnectionsManager} from "./connections/pendingDisconnections.ts";
 import { Player } from "./game/player.ts";
+import { Env } from "./index.ts";
+import {
+  LEADERBOARD_TOKEN_STORAGE_KEY,
+  LEADERBOARD_TOKEN_TTL_MS,
+  LeaderboardSubmitResult,
+  LeaderboardToken,
+  MAX_TEAM_NAME_LENGTH,
+} from "./api/leaderboard/leaderboardTypes.ts";
+import { normalizeCountryCode } from "./api/leaderboard/countryCodes.ts";
 
-export class LobbyServer extends DurableObject {
+export class LobbyServer extends DurableObject<Env> {
   private initialized = false;
 
   public room: Room = createEmptyRoom();
@@ -130,6 +139,92 @@ export class LobbyServer extends DurableObject {
 
   async webSocketMessage(ws: WebSocket, message: string) {
     await dispatchWsMessage(ws, message, this);
+  }
+
+  // Called once, when the room transitions into the "won" state. Issues a
+  // single-use submission token, persists it as this game's strongly-consistent
+  // source of truth, and broadcasts it (with the ranking stats) to every player
+  // so any of them can post the team to the leaderboard.
+  async onGameWon(): Promise<void> {
+    const stats = this.room.getWinStats();
+    const record: LeaderboardToken = {
+      token: crypto.randomUUID(),
+      expiresAt: Date.now() + LEADERBOARD_TOKEN_TTL_MS,
+      used: false,
+      stats,
+    };
+    await this.ctx.storage.put(LEADERBOARD_TOKEN_STORAGE_KEY, record);
+
+    this.broadcast({
+      type: "LEADERBOARD_ELIGIBLE",
+      token: record.token,
+      expiresAt: record.expiresAt,
+      finalSeconds: stats.finalSeconds,
+      livesLostCount: stats.livesLostCount,
+      shurikensUsedCount: stats.shurikensUsedCount,
+      playerCount: stats.playerCount,
+    });
+  }
+
+  // Direct RPC entry point (mirrors LobbyRegistry.tryInsert/getValue) used by
+  // POST /api/leaderboard/submit. The token is marked used and persisted BEFORE
+  // the D1 insert so a racing/duplicate request can only ever lose a win, never
+  // create a duplicate row.
+  async submitLeaderboardEntry(
+    token: string,
+    teamName: string,
+    countryCode: string,
+    shortCode: string,
+  ): Promise<LeaderboardSubmitResult> {
+    const record = await this.ctx.storage.get<LeaderboardToken>(
+      LEADERBOARD_TOKEN_STORAGE_KEY,
+    );
+
+    if (!record || record.token !== token) {
+      return { ok: false, error: "Invalid submission token.", status: 400 };
+    }
+    if (record.used) {
+      return { ok: false, error: "This win has already been submitted.", status: 409 };
+    }
+    if (Date.now() > record.expiresAt) {
+      return { ok: false, error: "The submission window has expired.", status: 410 };
+    }
+
+    const trimmedName = typeof teamName === "string" ? teamName.trim() : "";
+    if (trimmedName.length === 0) {
+      return { ok: false, error: "A team name is required.", status: 400 };
+    }
+    const cleanName = trimmedName.slice(0, MAX_TEAM_NAME_LENGTH);
+
+    const cleanCountry = normalizeCountryCode(countryCode);
+    if (!cleanCountry) {
+      return { ok: false, error: "Unrecognized country code.", status: 400 };
+    }
+
+    record.used = true;
+    await this.ctx.storage.put(LEADERBOARD_TOKEN_STORAGE_KEY, record);
+
+    const { finalSeconds, livesLostCount, shurikensUsedCount, playerCount } =
+      record.stats;
+
+    await this.env.DB.prepare(
+      `INSERT INTO leaderboard
+         (team_name, country_code, player_count, final_seconds,
+          lives_lost_count, shurikens_used_count, lobby_short_code, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
+    )
+      .bind(
+        cleanName,
+        cleanCountry,
+        playerCount,
+        finalSeconds,
+        livesLostCount,
+        shurikensUsedCount,
+        shortCode || null,
+      )
+      .run();
+
+    return { ok: true };
   }
 
   broadcast(data: object) {

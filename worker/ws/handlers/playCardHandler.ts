@@ -16,8 +16,13 @@ export class PlayCardHandler extends WsMessageHandler {
             wsSendError(ws, ownsCardResult.errorMessage??"");
             return;
         }
+        const wasWon = lobbyServer.room.state === "won";
         lobbyServer.room.playCard(this.card);
         await lobbyServer.saveLobbyState();
         await lobbyServer.sendLobbyState();
+
+        if (!wasWon && lobbyServer.room.state === "won") {
+            await lobbyServer.onGameWon();
+        }
     };
 }

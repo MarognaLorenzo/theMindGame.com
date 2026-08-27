@@ -1,4 +1,19 @@
 import { Player } from "./player.ts";
+
+// Stats captured at the moment a game is won, used to rank leaderboard entries.
+// The counters are incremented at each event rather than derived from
+// starting-minus-current values, because lives and shurikens can be regained
+// through assignRewards().
+export interface WinStats {
+  finalSeconds: number;
+  livesLostCount: number;
+  shurikensUsedCount: number;
+  playerCount: number;
+}
+
+// Seconds added to the raw play time for each life lost or shuriken used.
+const WIN_STATS_PENALTY_SECONDS = 20;
+
 export class Room {
   players: Player[] = [];
   discardPile: number[] = [];
@@ -8,6 +23,9 @@ export class Room {
   winningLevel: number = 0;
   state: "waiting" | "playing" | "won" | "lost" = "waiting";
   hostPlayerId: string | null = null;
+  gameStartedAt: number | null = null;
+  livesLostCount: number = 0;
+  shurikensUsedCount: number = 0;
 
   private highestCardInGame(): number | null {
     const allCards = this.players.flatMap((player) => player.hand);
@@ -63,6 +81,7 @@ export class Room {
       player.hand = player.hand.filter((card: number) => !cardsToAdd.includes(card));
     }
     this.shurikens -= 1;
+    this.shurikensUsedCount += 1;
     this.discardPile.push(...cardsToAdd);
     return true;
   }
@@ -90,6 +109,9 @@ export class Room {
     this.shurikens = 1;
     this.currentLevel = 1;
     this.discardPile = [];
+    this.gameStartedAt = Date.now();
+    this.livesLostCount = 0;
+    this.shurikensUsedCount = 0;
     switch (this.players.length) {
       case 2: this.winningLevel = 12; break;
       case 3: this.winningLevel = 10; break;
@@ -116,7 +138,27 @@ export class Room {
     this.shurikens = 0;
     this.currentLevel = 0;
     this.winningLevel = 0;
+    this.gameStartedAt = null;
+    this.livesLostCount = 0;
+    this.shurikensUsedCount = 0;
     this.players.forEach((player) => player.resetHand());
+  }
+
+  // Snapshot of the ranking-relevant stats at the moment the game is won.
+  public getWinStats(): WinStats {
+    const elapsedSeconds =
+      this.gameStartedAt === null ? 0 : (Date.now() - this.gameStartedAt) / 1000;
+    const finalSeconds =
+      elapsedSeconds +
+      WIN_STATS_PENALTY_SECONDS * this.livesLostCount +
+      WIN_STATS_PENALTY_SECONDS * this.shurikensUsedCount;
+
+    return {
+      finalSeconds,
+      livesLostCount: this.livesLostCount,
+      shurikensUsedCount: this.shurikensUsedCount,
+      playerCount: this.players.length,
+    };
   }
 
   public playerHasCard(playerId: string, card: number): boolean {
@@ -143,6 +185,7 @@ export class Room {
       return true;
     }
     this.lives -= 1;
+    this.livesLostCount += 1;
     if (this.lives <= 0) {
       this.state = "lost";
     }
@@ -230,6 +273,9 @@ export function hydrateRoom(roomData: Partial<Room> | null | undefined): Room {
   room.winningLevel = roomData.winningLevel ?? 0;
   room.state = roomData.state ?? "waiting";
   room.hostPlayerId = roomData.hostPlayerId ?? null;
+  room.gameStartedAt = roomData.gameStartedAt ?? null;
+  room.livesLostCount = roomData.livesLostCount ?? 0;
+  room.shurikensUsedCount = roomData.shurikensUsedCount ?? 0;
 
   return room;
 }

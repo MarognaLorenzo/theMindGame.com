@@ -1,11 +1,16 @@
 import { LobbyServer } from "./lobbyServerDO.ts";
 import { LobbyRegistry } from "./lobbyRegistryDO.ts";
 import { createLobby, joinLobby } from "./api/lobbyOperations.ts";
+import {
+  getLeaderboard,
+  submitLeaderboardEntry,
+} from "./api/leaderboard/leaderboardOperations.ts";
 import { Responder } from "./api/utils/responder.ts";
 
 export interface Env {
   LOBBY_SERVER: DurableObjectNamespace<LobbyServer>;
   LOBBY_REGISTRY: DurableObjectNamespace<LobbyRegistry>;
+  DB: D1Database;
   ALLOWED_ORIGINS?: string;
 }
 
@@ -33,6 +38,14 @@ const worker = {
 
     if (path === "/api/join") {
       return joinLobby(registryStub, request, env, responder);
+    }
+
+    if (path === "/api/leaderboard/submit" && request.method === "POST") {
+      return submitLeaderboardEntry(registryStub, request, env, responder);
+    }
+
+    if (path === "/api/leaderboard" && request.method === "GET") {
+      return getLeaderboard(request, env, responder);
     }
     return responder.respondWithError("Not Found", 404);
   }
