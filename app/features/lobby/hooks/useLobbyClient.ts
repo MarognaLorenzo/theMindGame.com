@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { SocketLobbyState } from "../types";
+import type { LeaderboardEligibility, SocketLobbyState } from "../types";
 import {
   LobbySocketController,
   toWsBaseUrl,
@@ -15,6 +15,12 @@ interface CreateLobbyResponse {
   lobbyId?: string;
 }
 
+interface LeaderboardSubmitErrorResponse {
+  error?: string;
+}
+
+export type LeaderboardSubmitStatus = "idle" | "submitting" | "submitted" | "error";
+
 export function useLobbyClient() {
   const [name, setName] = useState("");
   const [lobbyId, setLobbyId] = useState("");
@@ -23,6 +29,11 @@ export function useLobbyClient() {
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
   const [lobby, setLobby] = useState<SocketLobbyState | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [leaderboardEligibility, setLeaderboardEligibility] =
+    useState<LeaderboardEligibility | null>(null);
+  const [leaderboardSubmitStatus, setLeaderboardSubmitStatus] =
+    useState<LeaderboardSubmitStatus>("idle");
+  const [leaderboardSubmitError, setLeaderboardSubmitError] = useState("");
 
   const workerBaseUrl =
     process.env.NEXT_PUBLIC_WORKER_URL?.trim() || DEFAULT_WORKER_URL;
@@ -38,6 +49,11 @@ export function useLobbyClient() {
       setMyPlayerId,
       setLobby,
       setIsConnected,
+      setLeaderboardEligibility: (eligibility) => {
+        setLeaderboardEligibility(eligibility);
+        setLeaderboardSubmitStatus("idle");
+        setLeaderboardSubmitError("");
+      },
     });
   }
   const controller = controllerRef.current;
@@ -119,6 +135,39 @@ export function useLobbyClient() {
     controller.disconnect({ clearStoredSession: true, allowReconnect: false });
   }
 
+  async function submitLeaderboardEntry(teamName: string, countryCode: string) {
+    if (!leaderboardEligibility) {
+      return;
+    }
+
+    setLeaderboardSubmitStatus("submitting");
+    setLeaderboardSubmitError("");
+
+    try {
+      const res = await fetch(`${workerBaseUrl}/api/leaderboard/submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          shortCode: lobbyId,
+          token: leaderboardEligibility.token,
+          teamName,
+          countryCode,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as LeaderboardSubmitErrorResponse;
+        throw new Error(data.error ?? `Submission failed (${res.status})`);
+      }
+
+      setLeaderboardSubmitStatus("submitted");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      setLeaderboardSubmitError(message);
+      setLeaderboardSubmitStatus("error");
+    }
+  }
+
   function leaveLobby() {
     if (!validConnection()) {
       controller.disconnect({ clearStoredSession: true, allowReconnect: false });
@@ -167,6 +216,9 @@ export function useLobbyClient() {
     isConnected,
     isHost,
     workerBaseUrl,
+    leaderboardEligibility,
+    leaderboardSubmitStatus,
+    leaderboardSubmitError,
     createLobby,
     joinLobby,
     disconnectSocket: (options?: DisconnectOptions) => controller.disconnect(options),
@@ -175,5 +227,6 @@ export function useLobbyClient() {
     onShurikenUse,
     exitGame,
     leaveLobby,
+    submitLeaderboardEntry,
   };
 }

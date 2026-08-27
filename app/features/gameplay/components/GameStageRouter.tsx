@@ -1,4 +1,5 @@
-import type { SocketLobbyState } from "../../lobby/types";
+import type { LeaderboardSubmitStatus } from "../../lobby/hooks/useLobbyClient";
+import type { LeaderboardEligibility, SocketLobbyState } from "../../lobby/types";
 import { WaitingRoomPanel } from "../../lobby/components/WaitingRoomPanel";
 import { LostView } from "./LostView";
 import { PlayingView } from "./PlayingView";
@@ -13,6 +14,10 @@ interface GameStageRouterProps {
   onExitGame: () => void;
   onCardPlay: (card: number) => void;
   onShurikenUse: () => void;
+  leaderboardEligibility: LeaderboardEligibility | null;
+  leaderboardSubmitStatus: LeaderboardSubmitStatus;
+  leaderboardSubmitError: string;
+  onSubmitLeaderboardEntry: (teamName: string, countryCode: string) => void;
 }
 
 export function GameStageRouter({
@@ -24,6 +29,10 @@ export function GameStageRouter({
   onExitGame,
   onCardPlay,
   onShurikenUse,
+  leaderboardEligibility,
+  leaderboardSubmitStatus,
+  leaderboardSubmitError,
+  onSubmitLeaderboardEntry,
 }: GameStageRouterProps) {
   if (lobby.state === "playing") {
     return (
@@ -38,7 +47,17 @@ export function GameStageRouter({
   }
 
   if (lobby.state === "won") {
-    return <WonView lobby={lobby} isHost={isHost} onStartGame={onStartGame} />;
+    return (
+      <WonView
+        lobby={lobby}
+        isHost={isHost}
+        onStartGame={onStartGame}
+        leaderboardEligibility={leaderboardEligibility}
+        leaderboardSubmitStatus={leaderboardSubmitStatus}
+        leaderboardSubmitError={leaderboardSubmitError}
+        onSubmitLeaderboardEntry={onSubmitLeaderboardEntry}
+      />
+    );
   }
 
   if (lobby.state === "lost") {

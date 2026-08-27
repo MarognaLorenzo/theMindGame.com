@@ -1,12 +1,26 @@
-import type { SocketLobbyState } from "../../lobby/types";
+import { LeaderboardSubmitForm } from "../../leaderboard/components/LeaderboardSubmitForm";
+import type { LeaderboardSubmitStatus } from "../../lobby/hooks/useLobbyClient";
+import type { LeaderboardEligibility, SocketLobbyState } from "../../lobby/types";
 
 interface WonViewProps {
   lobby: SocketLobbyState;
   isHost: boolean;
   onStartGame?: () => void;
+  leaderboardEligibility: LeaderboardEligibility | null;
+  leaderboardSubmitStatus: LeaderboardSubmitStatus;
+  leaderboardSubmitError: string;
+  onSubmitLeaderboardEntry: (teamName: string, countryCode: string) => void;
 }
 
-export function WonView({ lobby, isHost, onStartGame }: WonViewProps) {
+export function WonView({
+  lobby,
+  isHost,
+  onStartGame,
+  leaderboardEligibility,
+  leaderboardSubmitStatus,
+  leaderboardSubmitError,
+  onSubmitLeaderboardEntry,
+}: WonViewProps) {
   return (
     <section className="game-result-enter game-result-win relative mt-8 overflow-hidden rounded-2xl border border-[#f1ba6a55] bg-[#3e2b1422] p-5 sm:p-6">
       <span className="result-particle result-particle-a" aria-hidden="true" />
@@ -15,6 +29,16 @@ export function WonView({ lobby, isHost, onStartGame }: WonViewProps) {
       <p className="mt-2 text-sm text-[#f2c98f]">
         Team completed level {lobby.currentLevel}. Clean run.
       </p>
+
+      {leaderboardEligibility ? (
+        <LeaderboardSubmitForm
+          eligibility={leaderboardEligibility}
+          status={leaderboardSubmitStatus}
+          error={leaderboardSubmitError}
+          onSubmit={onSubmitLeaderboardEntry}
+        />
+      ) : null}
+
       {isHost && onStartGame && (
         <button
           className="mt-4 min-h-11 w-full rounded-xl border border-[#f1ba6a88] bg-[#f1ba6a22] px-4 py-2.5 text-sm font-medium text-[#ffdcae] transition hover:bg-[#f1ba6a33] sm:w-auto"

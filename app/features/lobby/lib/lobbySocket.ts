@@ -1,4 +1,9 @@
-import type { ClientMessage, SocketLobbyState, SocketMessage } from "../types";
+import type {
+  ClientMessage,
+  LeaderboardEligibility,
+  SocketLobbyState,
+  SocketMessage,
+} from "../types";
 import { clearSession, loadStoredSession, persistSession } from "./sessionStorage";
 
 const MAX_RECONNECT_ATTEMPTS = 5;
@@ -23,6 +28,7 @@ export interface LobbySocketHandlers {
   setMyPlayerId(id: string | null): void;
   setLobby(lobby: SocketLobbyState | null): void;
   setIsConnected(connected: boolean): void;
+  setLeaderboardEligibility(eligibility: LeaderboardEligibility | null): void;
 }
 
 export function toWsBaseUrl(workerBaseUrl: string): string {
@@ -85,6 +91,7 @@ export class LobbySocketController {
     this.handlers.setMyPlayerId(null);
     if (clearLobbyState) {
       this.handlers.setLobby(null);
+      this.handlers.setLeaderboardEligibility(null);
     }
   }
 
@@ -213,6 +220,22 @@ export class LobbySocketController {
         if (data.type === "LOBBY_STATE") {
           this.handlers.setError("");
           this.handlers.setLobby(data.lobby);
+          // The token is only ever broadcast once, at the moment of the win; once the
+          // room moves on (a new game starts) it's no longer valid for submission.
+          if (data.lobby.state !== "won") {
+            this.handlers.setLeaderboardEligibility(null);
+          }
+        }
+
+        if (data.type === "LEADERBOARD_ELIGIBLE") {
+          this.handlers.setLeaderboardEligibility({
+            token: data.token,
+            expiresAt: data.expiresAt,
+            finalSeconds: data.finalSeconds,
+            livesLostCount: data.livesLostCount,
+            shurikensUsedCount: data.shurikensUsedCount,
+            playerCount: data.playerCount,
+          });
         }
 
         if (data.type === "ERROR") {

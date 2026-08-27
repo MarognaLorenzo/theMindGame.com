@@ -38,11 +38,28 @@ export interface SocketGameAbortedMessage {
   message: string;
 }
 
+// Stats behind the win, mirroring worker/game/room.ts's WinStats.
+export interface LeaderboardEligibility {
+  token: string;
+  expiresAt: number;
+  finalSeconds: number;
+  livesLostCount: number;
+  shurikensUsedCount: number;
+  playerCount: number;
+}
+
+// Sent once, to every player, the moment the room transitions to "won". Carries
+// the single-use token needed to submit this win to the leaderboard.
+export interface SocketLeaderboardEligibleMessage extends LeaderboardEligibility {
+  type: "LEADERBOARD_ELIGIBLE";
+}
+
 export type SocketMessage =
   | SocketJoinedMessage
   | SocketLobbyStateMessage
   | SocketErrorMessage
-  | SocketGameAbortedMessage;
+  | SocketGameAbortedMessage
+  | SocketLeaderboardEligibleMessage;
 
 export type ClientMessage =
   | { type: "JOIN" }
