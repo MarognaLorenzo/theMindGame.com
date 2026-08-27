@@ -10,6 +10,13 @@ export function PlayerHand({ cards, onCardPlay }: PlayerHandProps) {
     return <p className="px-1 text-center text-sm text-[var(--text-muted)]">No cards in hand.</p>;
   }
 
+  // A player may only ever attempt their own lowest card - everything else in
+  // hand is disabled client-side. This is unrelated to the server's mistake
+  // rule (playing a card that isn't the lowest across ALL players still costs
+  // a life there, as always); it just stops a player from being able to
+  // target their own highest card to maximize a single mistake's fallout.
+  const lowestCard = Math.min(...cards);
+
   const tiltCap = cards.length >= 9 ? 1 : cards.length >= 6 ? 2 : 3;
   const overlapPx =
     cards.length <= 1 ? 0 : Math.min(42, Math.max(10, Math.round(8 + (cards.length - 1) * 3.6)));
@@ -23,6 +30,7 @@ export function PlayerHand({ cards, onCardPlay }: PlayerHandProps) {
     <div className="isolate mx-auto flex w-fit items-end py-1">
       {cards.map((card, index) => {
         const tilt = (index % 2 === 0 ? -1 : 1) * Math.min(index, tiltCap);
+        const isPlayable = card === lowestCard;
 
         return (
           <div
@@ -36,8 +44,13 @@ export function PlayerHand({ cards, onCardPlay }: PlayerHandProps) {
           >
             <button
               onClick={() => onCardPlay(card)}
-              className={`${CARD_SURFACE_CLASSES} transition hover:-translate-y-1 focus-visible:-translate-y-1`}
-              aria-label={`Play card ${card}`}
+              disabled={!isPlayable}
+              className={`${CARD_SURFACE_CLASSES} transition ${
+                isPlayable
+                  ? "hover:-translate-y-1 focus-visible:-translate-y-1"
+                  : "cursor-not-allowed opacity-50"
+              }`}
+              aria-label={isPlayable ? `Play card ${card}` : `${card} (play your lowest card first)`}
             >
               <CardFace value={card} />
             </button>
