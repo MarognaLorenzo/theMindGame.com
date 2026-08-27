@@ -14,6 +14,7 @@ import {
   MAX_TEAM_NAME_LENGTH,
 } from "./api/leaderboard/leaderboardTypes.ts";
 import { normalizeCountryCode } from "./api/leaderboard/countryCodes.ts";
+import { notifyPendingSubmission } from "./api/leaderboard/reviewNotifier.ts";
 
 export class LobbyServer extends DurableObject<Env> {
   private initialized = false;
@@ -207,7 +208,7 @@ export class LobbyServer extends DurableObject<Env> {
     const { finalSeconds, livesLostCount, shurikensUsedCount, playerCount } =
       record.stats;
 
-    await this.env.DB.prepare(
+    const insertResult = await this.env.DB.prepare(
       `INSERT INTO leaderboard
          (team_name, country_code, player_count, final_seconds,
           lives_lost_count, shurikens_used_count, lobby_short_code, status)
@@ -223,6 +224,14 @@ export class LobbyServer extends DurableObject<Env> {
         shortCode || null,
       )
       .run();
+
+    await notifyPendingSubmission(this.env.DISCORD_WEBHOOK_URL, {
+      id: insertResult.meta.last_row_id,
+      teamName: cleanName,
+      countryCode: cleanCountry,
+      playerCount,
+      finalSeconds,
+    });
 
     return { ok: true };
   }

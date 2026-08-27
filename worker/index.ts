@@ -12,6 +12,7 @@ export interface Env {
   LOBBY_REGISTRY: DurableObjectNamespace<LobbyRegistry>;
   DB: D1Database;
   ALLOWED_ORIGINS?: string;
+  DISCORD_WEBHOOK_URL?: string;
 }
 
 const REGISTRY_OBJECT_NAME = "global-registry";
