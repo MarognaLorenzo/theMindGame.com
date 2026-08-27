@@ -24,10 +24,17 @@ export class Responder {
   }
 
   public respondWithJson(data: any, status: number = 200): Response {
+    // The Fetch spec forbids a body on these statuses; the runtime throws if one is
+    // attached. 204 in particular is what our own OPTIONS preflight handler returns,
+    // so this isn't just theoretical - every cross-origin POST/PUT/etc. with a JSON
+    // body triggers a preflight that would otherwise crash before CORS headers are
+    // ever attached, which the browser then reports as a CORS failure.
+    const isNullBodyStatus = status === 101 || status === 204 || status === 205 || status === 304;
+
     return withCors(
-      new Response(JSON.stringify(data), {
+      new Response(isNullBodyStatus ? null : JSON.stringify(data), {
         status,
-        headers: { "Content-Type": "application/json" },
+        headers: isNullBodyStatus ? {} : { "Content-Type": "application/json" },
       }),
       this.request,
       this.env,

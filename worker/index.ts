@@ -25,29 +25,34 @@ const worker = {
   async fetch(request: Request, env: Env): Promise<Response> {
     const responder = new Responder(request, env);
 
-    if (request.method === "OPTIONS") {
-      return responder.respondWithJson({}, 204);
-    }
+    try {
+      if (request.method === "OPTIONS") {
+        return responder.respondWithJson({}, 204);
+      }
 
-    const path = (new URL(request.url)).pathname;
-    const registryStub = getRegistryStub(env);
+      const path = (new URL(request.url)).pathname;
+      const registryStub = getRegistryStub(env);
 
-    if (path === "/api/create") {
-      return createLobby(registryStub, env, responder);
-    }
+      if (path === "/api/create") {
+        return await createLobby(registryStub, env, responder);
+      }
 
-    if (path === "/api/join") {
-      return joinLobby(registryStub, request, env, responder);
-    }
+      if (path === "/api/join") {
+        return await joinLobby(registryStub, request, env, responder);
+      }
 
-    if (path === "/api/leaderboard/submit" && request.method === "POST") {
-      return submitLeaderboardEntry(registryStub, request, env, responder);
-    }
+      if (path === "/api/leaderboard/submit" && request.method === "POST") {
+        return await submitLeaderboardEntry(registryStub, request, env, responder);
+      }
 
-    if (path === "/api/leaderboard" && request.method === "GET") {
-      return getLeaderboard(request, env, responder);
+      if (path === "/api/leaderboard" && request.method === "GET") {
+        return await getLeaderboard(request, env, responder);
+      }
+      return responder.respondWithError("Not Found", 404);
+    } catch (err) {
+      console.error("Unhandled error in worker fetch:", err);
+      return responder.respondWithError("Internal Server Error", 500);
     }
-    return responder.respondWithError("Not Found", 404);
   }
 };
 
