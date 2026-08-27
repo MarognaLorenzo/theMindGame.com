@@ -1,3 +1,4 @@
+import { HeartIcon, ShurikenIcon } from "../../gameplay/components/icons";
 import { countryCodeToFlagEmoji } from "../lib/countryFlag";
 import { breakDownScore, formatSeconds } from "../lib/scoring";
 import type { LeaderboardEntry } from "../types";
@@ -8,21 +9,10 @@ interface LeaderboardEntryRowProps {
 }
 
 const RANK_MEDALS: Record<number, string> = { 1: "🥇", 2: "🥈", 3: "🥉" };
+const STAT_ICON_CLASSNAME = "h-3.5 w-3.5";
 
 export function LeaderboardEntryRow({ rank, entry }: LeaderboardEntryRowProps) {
-  const { baseSeconds, livesPenaltySeconds, shurikensPenaltySeconds } = breakDownScore(entry);
-
-  const breakdownParts = [`${formatSeconds(baseSeconds)} base`];
-  if (entry.livesLostCount > 0) {
-    breakdownParts.push(
-      `+${formatSeconds(livesPenaltySeconds)} (${entry.livesLostCount} ${entry.livesLostCount === 1 ? "life" : "lives"} lost)`,
-    );
-  }
-  if (entry.shurikensUsedCount > 0) {
-    breakdownParts.push(
-      `+${formatSeconds(shurikensPenaltySeconds)} (${entry.shurikensUsedCount} ${entry.shurikensUsedCount === 1 ? "shuriken" : "shurikens"} used)`,
-    );
-  }
+  const { baseSeconds } = breakDownScore(entry);
 
   return (
     <li className="flex items-center gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-2)] px-3 py-3 sm:gap-4 sm:px-4">
@@ -34,8 +24,20 @@ export function LeaderboardEntryRow({ rank, entry }: LeaderboardEntryRowProps) {
       </span>
       <div className="min-w-0 flex-1">
         <p className="truncate font-semibold text-[var(--text-strong)]">{entry.teamName}</p>
-        <p className="mt-0.5 truncate text-xs text-[var(--text-muted)]">
-          {breakdownParts.join(" · ")}
+        <p className="mt-0.5 flex items-center gap-2 text-xs text-[var(--text-muted)]">
+          <span>{formatSeconds(baseSeconds)}</span>
+          {entry.livesLostCount > 0 ? (
+            <span className="inline-flex items-center gap-0.5 text-[#ff8f8f]">
+              <HeartIcon className={STAT_ICON_CLASSNAME} />
+              {entry.livesLostCount}
+            </span>
+          ) : null}
+          {entry.shurikensUsedCount > 0 ? (
+            <span className="inline-flex items-center gap-0.5 text-[var(--accent)]">
+              <ShurikenIcon className={STAT_ICON_CLASSNAME} />
+              {entry.shurikensUsedCount}
+            </span>
+          ) : null}
         </p>
       </div>
       <span className="shrink-0 text-lg font-bold text-[var(--accent)]">

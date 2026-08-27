@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useLeaderboardEntries } from "../hooks/useLeaderboardEntries";
 import { LeaderboardEntryRow } from "./LeaderboardEntryRow";
+import { ScoreInfoTooltip } from "./ScoreInfoTooltip";
 
 const PLAYER_COUNTS = [2, 3, 4] as const;
 type PlayerCount = (typeof PLAYER_COUNTS)[number];
@@ -65,6 +66,11 @@ export function LeaderboardModal({ workerBaseUrl, onClose }: LeaderboardModalPro
               {count} Players
             </button>
           ))}
+        </div>
+
+        <div className="flex items-center gap-1.5 px-5 pt-3 text-xs text-[var(--text-muted)]">
+          <span>Ranked by score (lower is better)</span>
+          <ScoreInfoTooltip />
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
