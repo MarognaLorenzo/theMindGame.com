@@ -26,3 +26,38 @@ migrations_dir = "migrations"
 
 [vars]
 ALLOWED_ORIGINS = "https://themindgameonline3-0-pages.pages.dev,http://localhost:3000,https://the-mind-game.com,*.themindgameonline3-0-pages.pages.dev"
+
+# Isolated preview deployment: Workers Preview URLs don't support Durable
+# Objects, so this is the workaround - a separate, distinctly-named Worker
+# with its own DO namespace, deployed via `wrangler deploy --env preview`.
+# It reuses the same D1 database as the top-level config (no separate
+# database was requested), but bindings/migrations are NOT inherited from
+# the top-level config by named environments, so everything is re-declared
+# below.
+[env.preview]
+name = "the-mind-game-worker-preview"
+
+[[env.preview.durable_objects.bindings]]
+name = "LOBBY_SERVER"
+class_name = "LobbyServer"
+
+[[env.preview.durable_objects.bindings]]
+name = "LOBBY_REGISTRY"
+class_name = "LobbyRegistry"
+
+[[env.preview.migrations]]
+tag = "v1"
+new_sqlite_classes = ["LobbyServer"]
+
+[[env.preview.migrations]]
+tag = "v2"
+new_sqlite_classes = ["LobbyRegistry"]
+
+[[env.preview.d1_databases]]
+binding = "DB"
+database_name = "the-mind-game-leaderboard"
+database_id = "7c52f09e-308d-47c9-b357-267df4857236"
+migrations_dir = "migrations"
+
+[env.preview.vars]
+ALLOWED_ORIGINS = "https://themindgameonline3-0-pages.pages.dev,http://localhost:3000,https://the-mind-game.com,*.themindgameonline3-0-pages.pages.dev"
