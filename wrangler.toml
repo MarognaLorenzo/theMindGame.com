@@ -25,4 +25,4 @@ database_id = "7c52f09e-308d-47c9-b357-267df4857236"
 migrations_dir = "migrations"
 
 [vars]
-ALLOWED_ORIGINS = "https://themindgameonline3-0-pages.pages.dev,http://localhost:3000,https://the-mind-game.com"
+ALLOWED_ORIGINS = "https://themindgameonline3-0-pages.pages.dev,http://localhost:3000,https://the-mind-game.com,*.themindgameonline3-0-pages.pages.dev"

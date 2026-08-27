@@ -15,6 +15,22 @@ function resolveAllowedOrigins(env: Env): string[] {
 }
 
 
+// An allowlist entry of the form "*.example.com" matches any subdomain of that
+// exact domain (e.g. a Cloudflare Pages preview URL like
+// <hash>.themindgameonline3-0-pages.pages.dev) - never the bare shared suffix
+// (".pages.dev" itself is a domain every Cloudflare Pages customer shares, so
+// this only ever matches subdomains of a domain YOU explicitly listed, never
+// an unrelated project's).
+function isOriginAllowed(origin: string, allowedOrigins: string[]): boolean {
+  return allowedOrigins.some((entry) => {
+    if (entry.startsWith("*.")) {
+      const suffix = entry.slice(1); // "*.foo.com" -> ".foo.com" (keeps the leading dot)
+      return origin.length > suffix.length && origin.endsWith(suffix);
+    }
+    return origin === entry;
+  });
+}
+
 export function buildCorsHeaders(request: Request, env: Env): Record<string, string> {
   const origin = request.headers.get("Origin")?.trim();
   const allowedOrigins = resolveAllowedOrigins(env);
@@ -23,7 +39,7 @@ export function buildCorsHeaders(request: Request, env: Env): Record<string, str
   let allowedOrigin = DEFAULT_ALLOWED_ORIGINS[0];
   if (allowAnyOrigin) {
     allowedOrigin = "*";
-  } else if (origin && allowedOrigins.includes(origin)) {
+  } else if (origin && isOriginAllowed(origin, allowedOrigins)) {
     allowedOrigin = origin;
   } else if (allowedOrigins.length > 0) {
     allowedOrigin = allowedOrigins[0];
