@@ -47,7 +47,7 @@ export function PlayerHand({ cards, onCardPlay }: PlayerHandProps) {
               disabled={!isPlayable}
               className={`${CARD_SURFACE_CLASSES} transition ${
                 isPlayable
-                  ? "-translate-y-1.5 ring-2 ring-[var(--accent)] shadow-[0_0_18px_rgba(124,228,192,0.55)] hover:-translate-y-2 focus-visible:-translate-y-2"
+                  ? "hover:-translate-y-1 focus-visible:-translate-y-1"
                   : "cursor-not-allowed"
               }`}
               aria-label={isPlayable ? `Play card ${card}` : `${card} (play your lowest card first)`}
