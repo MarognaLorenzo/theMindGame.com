@@ -7,6 +7,7 @@ import {PendingDisconnectionsManager} from "./connections/pendingDisconnections.
 import { Player } from "./game/player.ts";
 import { Env } from "./index.ts";
 import {
+  isValidLeaderboardPlayerCount,
   LEADERBOARD_TOKEN_STORAGE_KEY,
   LEADERBOARD_TOKEN_TTL_MS,
   LeaderboardSubmitResult,
@@ -148,6 +149,11 @@ export class LobbyServer extends DurableObject<Env> {
   // so any of them can post the team to the leaderboard.
   async onGameWon(): Promise<void> {
     const stats = this.room.getWinStats();
+    if (!isValidLeaderboardPlayerCount(stats.playerCount)) {
+      // e.g. a solo test game - won normally, but not a ranked team size.
+      return;
+    }
+
     const record: LeaderboardToken = {
       token: crypto.randomUUID(),
       expiresAt: Date.now() + LEADERBOARD_TOKEN_TTL_MS,
@@ -200,6 +206,13 @@ export class LobbyServer extends DurableObject<Env> {
     const cleanCountry = normalizeCountryCode(countryCode);
     if (!cleanCountry) {
       return { ok: false, error: "Unrecognized country code.", status: 400 };
+    }
+
+    // Belt-and-suspenders: onGameWon() already withholds tokens for ineligible
+    // team sizes, but this is what stands between a malformed record and an
+    // uncaught D1 CHECK-constraint exception (which would bypass CORS entirely).
+    if (!isValidLeaderboardPlayerCount(record.stats.playerCount)) {
+      return { ok: false, error: "This lobby size is not eligible for the leaderboard.", status: 400 };
     }
 
     record.used = true;

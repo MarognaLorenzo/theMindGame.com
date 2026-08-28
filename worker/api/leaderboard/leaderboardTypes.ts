@@ -21,3 +21,12 @@ export const MAX_TEAM_NAME_LENGTH = 30;
 export const LEADERBOARD_TOKEN_TTL_MS = 5 * 60 * 1000;
 
 export const LEADERBOARD_TOKEN_STORAGE_KEY = "leaderboard-token";
+
+// Team sizes the leaderboard ranks (matches the D1 CHECK constraint on
+// player_count). Games outside this range - e.g. a solo test game - are won
+// normally but never become leaderboard-eligible.
+export const VALID_LEADERBOARD_PLAYER_COUNTS = [2, 3, 4] as const;
+
+export function isValidLeaderboardPlayerCount(playerCount: number): boolean {
+  return (VALID_LEADERBOARD_PLAYER_COUNTS as readonly number[]).includes(playerCount);
+}
