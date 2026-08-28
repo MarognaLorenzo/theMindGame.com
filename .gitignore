@@ -41,3 +41,6 @@ yarn-error.log*
 next-env.d.ts
 
 .wrangler*
+
+# local-only project instructions (references this machine's personal Obsidian setup)
+CLAUDE.md
