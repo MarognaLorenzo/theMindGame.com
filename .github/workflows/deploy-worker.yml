@@ -1,0 +1,51 @@
+name: Deploy Worker
+
+# The frontend (Cloudflare Pages) auto-deploys on push via Pages' own Git
+# integration. The Worker has no such integration, so this workflow mirrors it:
+#   - push to `main`            -> deploy the production Worker
+#   - push to any other branch  -> deploy the shared `-preview` Worker
+# Only runs when backend-relevant files change (see `paths` below).
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'worker/**'
+      - 'migrations/**'
+      - 'wrangler.toml'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/deploy-worker.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Don't let two pushes to the same branch deploy concurrently.
+    concurrency: deploy-worker-${{ github.ref }}
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # Gate: fail the deploy if the worker (or anything else) doesn't typecheck.
+      - run: npx tsc --noEmit
+
+      - name: Deploy production Worker
+        if: github.ref == 'refs/heads/main'
+        run: |
+          npx wrangler d1 migrations apply the-mind-game-leaderboard --remote
+          npx wrangler deploy
+
+      - name: Deploy preview Worker
+        if: github.ref != 'refs/heads/main'
+        run: |
+          npx wrangler d1 migrations apply the-mind-game-leaderboard-preview --remote --env preview
+          npx wrangler deploy --env preview
