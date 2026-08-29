@@ -21,8 +21,11 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # Don't let two pushes to the same branch deploy concurrently.
-    concurrency: deploy-worker-${{ github.ref }}
+    # Serialize by target environment, not by branch: every non-main branch
+    # deploys to the SAME preview Worker/D1, so two different feature branches
+    # pushing close together would otherwise race against that shared target.
+    # Production gets its own group so a preview deploy never waits on it.
+    concurrency: deploy-worker-${{ github.ref == 'refs/heads/main' && 'production' || 'preview' }}
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
