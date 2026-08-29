@@ -16,9 +16,14 @@ import {
 } from "./api/leaderboard/leaderboardTypes.ts";
 import { normalizeCountryCode } from "./api/leaderboard/countryCodes.ts";
 import { notifyPendingSubmission } from "./api/leaderboard/reviewNotifier.ts";
+import { AnalyticsEventName, AnalyticsFields, track } from "./analytics/track.ts";
 
 export class LobbyServer extends DurableObject<Env> {
   private initialized = false;
+
+  // The lobby's short join code, learned from the first `/api/join` URL and
+  // persisted so game events can be correlated back to a lobby.
+  private shortCode: string | null = null;
 
   public room: Room = createEmptyRoom();
 
@@ -39,7 +44,20 @@ export class LobbyServer extends DurableObject<Env> {
     // Using RPC connection is not possible because web sockets are not serializable and cannot be passed through RPC.
     const playerName = url.searchParams.get("name");
     const resumeToken = url.searchParams.get("resumeToken");
+    const lobbyId = url.searchParams.get("lobbyId");
+    if (lobbyId) {
+      await this.rememberShortCode(lobbyId);
+    }
     return this.playerFirstTimeAccess(playerName!, resumeToken);
+  }
+
+  private async rememberShortCode(code: string) {
+    await this.ensureLoaded();
+    if (this.shortCode === code) {
+      return;
+    }
+    this.shortCode = code;
+    await this.ctx.storage.put("lobby-short-code", code);
   }
 
   public async ensureLoaded() {
@@ -51,6 +69,8 @@ export class LobbyServer extends DurableObject<Env> {
     if (storedLobby) {
       this.room = hydrateRoom(storedLobby);
     }
+
+    this.shortCode = (await this.ctx.storage.get<string>("lobby-short-code")) ?? null;
 
     this.reconcilePlayersFromSockets();
     this.initialized = true;
@@ -149,6 +169,15 @@ export class LobbyServer extends DurableObject<Env> {
   // so any of them can post the team to the leaderboard.
   async onGameWon(): Promise<void> {
     const stats = this.room.getWinStats();
+
+    // Record every win, including solo/unranked ones the leaderboard ignores.
+    this.trackEvent("game_won", {
+      playerCount: stats.playerCount,
+      finalSeconds: stats.finalSeconds,
+      livesLostCount: stats.livesLostCount,
+      shurikensUsedCount: stats.shurikensUsedCount,
+    });
+
     if (!isValidLeaderboardPlayerCount(stats.playerCount)) {
       // e.g. a solo test game - won normally, but not a ranked team size.
       return;
@@ -254,6 +283,15 @@ export class LobbyServer extends DurableObject<Env> {
     );
 
     return { ok: true };
+  }
+
+  // Pass-through to the analytics helper so WS handlers (which only get the
+  // LobbyServer instance, not `env`) can record events.
+  trackEvent(name: AnalyticsEventName, fields: AnalyticsFields = {}) {
+    track(this.env, name, {
+      shortCode: this.shortCode ?? undefined,
+      ...fields,
+    });
   }
 
   broadcast(data: object) {

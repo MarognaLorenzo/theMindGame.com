@@ -1,6 +1,7 @@
 import { Env, LobbyRegistry } from "../index.ts";
 import { Responder } from "./utils/responder.ts";
 import { generateShortCode } from "./utils/shortCodeLib.ts";
+import { track } from "../analytics/track.ts";
 
 export async function createLobby(
   registryStub: DurableObjectStub<LobbyRegistry>,
@@ -13,6 +14,7 @@ export async function createLobby(
       while (!await registryStub.tryInsert(candidateCode, lobbyServerDOId)) {
         candidateCode = generateShortCode();
       }
+      track(env, "lobby_created", { shortCode: candidateCode });
       return responder.respondWithJson({ lobbyId: candidateCode });
     }
 
