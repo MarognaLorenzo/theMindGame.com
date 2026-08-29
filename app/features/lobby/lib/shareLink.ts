@@ -4,8 +4,14 @@
 // router in this app (static export, single page), so intake is done manually on mount in
 // useLobbyClient: the param pre-fills the join form, then it is stripped from the URL.
 
-// Mirrors SHORT_CODE_ALPHABET / SHORT_CODE_LENGTH in worker/api/utils/shortCodeLib.ts.
-const SHORT_CODE_RE = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/;
+// Client-side copy of the lobby short-code format. Mirrors SHORT_CODE_ALPHABET /
+// SHORT_CODE_LENGTH in worker/api/utils/shortCodeLib.ts — kept as a local copy rather than a
+// cross-import, the same way the leaderboard client mirrors server constants (see
+// app/features/leaderboard/lib/scoring.ts). The names match the worker's so the pair is
+// greppable if the format ever changes.
+const SHORT_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const SHORT_CODE_LENGTH = 6;
+const SHORT_CODE_RE = new RegExp(`^[${SHORT_CODE_ALPHABET}]{${SHORT_CODE_LENGTH}}$`);
 
 const LOBBY_QUERY_PARAM = "lobby";
 
@@ -50,7 +56,7 @@ export function stripLobbyCodeFromUrl(): void {
   );
 }
 
-export type ShareOutcome = "shared" | "copied" | "error";
+export type ShareOutcome = "shared" | "copied" | "error" | "cancelled";
 
 // Prefers the native share sheet (mobile) and falls back to copying to the clipboard.
 export async function shareJoinLink(lobbyId: string): Promise<ShareOutcome> {
@@ -65,9 +71,10 @@ export async function shareJoinLink(lobbyId: string): Promise<ShareOutcome> {
       });
       return "shared";
     } catch (err) {
-      // AbortError = user dismissed the share sheet; treat as a no-op, not a failure.
+      // AbortError = user dismissed the share sheet. Nothing was shared, so report it as a
+      // no-op rather than a success or an error; the caller leaves the UI untouched.
       if (err instanceof DOMException && err.name === "AbortError") {
-        return "shared";
+        return "cancelled";
       }
       // Any other share failure: fall through to the clipboard path.
     }

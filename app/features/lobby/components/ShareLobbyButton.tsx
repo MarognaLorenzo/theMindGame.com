@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { buildJoinUrl, shareJoinLink, type ShareOutcome } from "../lib/shareLink";
+import { buildJoinUrl, shareJoinLink } from "../lib/shareLink";
 import { AlertIcon, CheckIcon, LinkIcon } from "./icons";
 
 interface ShareLobbyButtonProps {
   lobbyId: string;
 }
 
-type Feedback = "idle" | ShareOutcome;
+// A cancelled native share is a no-op and never becomes a feedback state.
+type Feedback = "idle" | "copied" | "shared" | "error";
 
 const LABELS: Record<Feedback, string> = {
   idle: "Copy invite link",
@@ -36,6 +37,9 @@ export function ShareLobbyButton({ lobbyId }: ShareLobbyButtonProps) {
 
   async function onShare() {
     const outcome = await shareJoinLink(lobbyId);
+    if (outcome === "cancelled") {
+      return;
+    }
     setFeedback(outcome);
     if (resetTimer.current !== null) {
       window.clearTimeout(resetTimer.current);
