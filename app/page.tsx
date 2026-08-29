@@ -15,6 +15,8 @@ export default function Home() {
     setName,
     lobbyId,
     setLobbyId,
+    lobbyFlow,
+    setLobbyFlow,
     error,
     myPlayerId,
     lobby,
@@ -35,7 +37,6 @@ export default function Home() {
 
   const isPlaying = lobby?.state === "playing";
   const hasJoinedLobby = Boolean(lobby);
-  const [lobbyFlow, setLobbyFlow] = useState<"create" | "join">("create");
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
   const showLobbyControls = !isPlaying;
   const shouldRenderGameStage = Boolean(lobby);
