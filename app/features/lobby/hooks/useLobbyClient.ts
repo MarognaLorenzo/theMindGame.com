@@ -7,7 +7,12 @@ import {
   toWsBaseUrl,
   type DisconnectOptions,
 } from "../lib/lobbySocket";
-import { getStoredSessionForLobby, loadStoredSession } from "../lib/sessionStorage";
+import {
+  clearSession,
+  getStoredSessionForLobby,
+  loadStoredSession,
+} from "../lib/sessionStorage";
+import { readLobbyCodeFromUrl, stripLobbyCodeFromUrl } from "../lib/shareLink";
 
 const DEFAULT_WORKER_URL = "http://127.0.0.1:8787";
 
@@ -24,6 +29,7 @@ export type LeaderboardSubmitStatus = "idle" | "submitting" | "submitted" | "err
 export function useLobbyClient() {
   const [name, setName] = useState("");
   const [lobbyId, setLobbyId] = useState("");
+  const [lobbyFlow, setLobbyFlow] = useState<"create" | "join">("create");
   const [status, setStatus] = useState("Ready");
   const [error, setError] = useState("");
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
@@ -179,6 +185,33 @@ export function useLobbyClient() {
 
   useEffect(() => {
     const session = loadStoredSession();
+
+    const linkedLobbyId = readLobbyCodeFromUrl();
+    if (linkedLobbyId) {
+      stripLobbyCodeFromUrl();
+      const sessionMatchesLink =
+        session && session.lobbyId.trim().toUpperCase() === linkedLobbyId;
+
+      if (!sessionMatchesLink) {
+        // An invite link is an explicit intent to join a specific lobby, so it wins over a
+        // lingering session for a different one. Pre-fill the join form and stop here.
+        if (session) {
+          clearSession();
+        }
+        // These setState calls intentionally run post-mount rather than during render: this is a
+        // static export with no server-side `window`, so reading the URL/localStorage during
+        // render would make the client's first render diverge from the pre-rendered HTML and
+        // trigger a hydration mismatch. Deferring to an effect is the correct trade-off here, not
+        // the "cascading renders" issue this rule normally warns about.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setLobbyId(linkedLobbyId);
+        setLobbyFlow("join");
+        setStatus("Ready");
+        return;
+      }
+      // The stored session is for the invited lobby — fall through and resume it.
+    }
+
     if (!session) {
       return;
     }
@@ -209,6 +242,8 @@ export function useLobbyClient() {
     setName,
     lobbyId,
     setLobbyId,
+    lobbyFlow,
+    setLobbyFlow,
     status,
     error,
     myPlayerId,

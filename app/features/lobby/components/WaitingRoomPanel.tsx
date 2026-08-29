@@ -1,4 +1,5 @@
 import type { SocketLobbyState } from "../types";
+import { ShareLobbyButton } from "./ShareLobbyButton";
 
 interface WaitingRoomPanelProps {
   lobbyId: string;
@@ -22,9 +23,12 @@ export function WaitingRoomPanel({
           <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-muted)]">
             Lobby Code
           </p>
-          <p className="font-mono text-2xl font-bold tracking-[0.18em] text-[var(--text-strong)] sm:text-3xl sm:tracking-[0.25em]">
-            {lobbyId || "------"}
-          </p>
+          <div className="flex items-center gap-3">
+            <p className="font-mono text-2xl font-bold tracking-[0.18em] text-[var(--text-strong)] sm:text-3xl sm:tracking-[0.25em]">
+              {lobbyId || "------"}
+            </p>
+            <ShareLobbyButton lobbyId={lobbyId} />
+          </div>
         </div>
         <div className="w-fit rounded-full border border-[var(--border-subtle)] bg-[var(--surface-1)] px-3 py-1 text-xs text-[var(--text-muted)]">
           State: {lobby.state}
