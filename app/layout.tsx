@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, Space_Mono } from "next/font/google";
 import "./globals.css";
+import { SITE_URL } from "./lib/site";
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
@@ -14,7 +15,7 @@ const spaceMono = Space_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://the-mind-game.com"),
+  metadataBase: new URL(SITE_URL),
   title: {
     default: "The Mind Online",
     template: "%s | The Mind Online",
@@ -26,7 +27,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: "website",
-    url: "https://the-mind-game.com",
+    url: SITE_URL,
     title: "The Mind Online",
     description:
       "Play The Mind online in your browser with a focused multiplayer lobby experience.",

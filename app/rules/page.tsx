@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { SITE_URL } from "../lib/site";
 
 export const metadata: Metadata = {
   title: "Rules",
@@ -12,7 +13,7 @@ export const metadata: Metadata = {
     title: "The Mind Online Rules",
     description:
       "Learn how to play The Mind online, including core rules, lives, shurikens, and win conditions.",
-    url: "https://the-mind-game.com/rules",
+    url: `${SITE_URL}/rules`,
     images: ["/og-image.svg"],
   },
 };

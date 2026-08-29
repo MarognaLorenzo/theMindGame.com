@@ -1,8 +1,10 @@
+import { SITE_URL } from "../../lib/site";
+
 export const gameSchema = {
   "@context": "https://schema.org",
   "@type": "VideoGame",
   name: "The Mind Online",
-  url: "https://the-mind-game.com",
+  url: SITE_URL,
   description:
     "Play The Mind online in your browser with a focused multiplayer lobby experience.",
   genre: ["Card Game", "Cooperative Game", "Multiplayer"],

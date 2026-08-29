@@ -4,7 +4,7 @@ The Mind Online is a browser-based multiplayer recreation of the cooperative car
 
 This project is a fan-made online recreation inspired by *The Mind* by Wolfgang Warsch.
 
-Play for free at [the-mind-game.com](https://the-mind-game.com).
+Play for free at [themindgame.app](https://themindgame.app).
 
 Original rules: [The Mind rulebook](https://cdn.1j1ju.com/medias/4c/1e/25-the-mind-rulebook.pdf).
 
