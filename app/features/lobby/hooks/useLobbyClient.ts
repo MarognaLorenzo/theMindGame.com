@@ -198,6 +198,12 @@ export function useLobbyClient() {
         if (session) {
           clearSession();
         }
+        // These setState calls intentionally run post-mount rather than during render: this is a
+        // static export with no server-side `window`, so reading the URL/localStorage during
+        // render would make the client's first render diverge from the pre-rendered HTML and
+        // trigger a hydration mismatch. Deferring to an effect is the correct trade-off here, not
+        // the "cascading renders" issue this rule normally warns about.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setLobbyId(linkedLobbyId);
         setLobbyFlow("join");
         setStatus("Ready");
