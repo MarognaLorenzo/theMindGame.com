@@ -69,6 +69,15 @@ export function ShareLobbyButton({ lobbyId }: ShareLobbyButtonProps) {
       >
         <Icon />
       </button>
+      {isSuccess ? (
+        <span
+          key={feedback}
+          aria-hidden="true"
+          className="share-toast pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 whitespace-nowrap rounded-full border border-[var(--accent)]/40 bg-[var(--surface-1)] px-3 py-1 text-xs font-semibold text-[var(--accent)] shadow-lg"
+        >
+          {LABELS[feedback]}
+        </span>
+      ) : null}
       {isError ? (
         <p className="absolute left-0 top-full z-10 mt-1.5 w-56 select-all break-all rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-1)] p-2 text-xs text-[var(--text-muted)] shadow-lg">
           {buildJoinUrl(lobbyId)}

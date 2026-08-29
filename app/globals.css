@@ -432,6 +432,29 @@ input {
   box-shadow: 0 0 9px rgba(255, 181, 190, 0.45);
 }
 
+@keyframes share-toast-pop {
+  0% {
+    transform: translate(-50%, 4px) scale(0.92);
+    opacity: 0;
+  }
+  12% {
+    transform: translate(-50%, 0) scale(1);
+    opacity: 1;
+  }
+  82% {
+    transform: translate(-50%, 0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -4px) scale(0.96);
+    opacity: 0;
+  }
+}
+
+.share-toast {
+  animation: share-toast-pop 2.2s cubic-bezier(0.2, 0.86, 0.32, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .life-meter-gain,
   .life-meter-loss,
@@ -449,5 +472,10 @@ input {
   .result-particle {
     animation: none;
     transform: none;
+  }
+
+  .share-toast {
+    animation: none;
+    transform: translateX(-50%);
   }
 }
