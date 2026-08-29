@@ -13,6 +13,9 @@ export class StartGameHandler extends WsMessageHandler {
         }
 
         if (await lobbyServer.room.startGame()) {
+        lobbyServer.trackEvent("game_started", {
+            playerCount: lobbyServer.room.players.length,
+        });
         lobbyServer.broadcast({
             type: "GAME_STARTED",
             players: lobbyServer.room.players.map((p) => ({ id: p.id, name: p.name })),

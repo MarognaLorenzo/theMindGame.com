@@ -24,6 +24,10 @@ database_name = "the-mind-game-leaderboard"
 database_id = "7c52f09e-308d-47c9-b357-267df4857236"
 migrations_dir = "migrations"
 
+[[analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "the-mind-game-events"
+
 [vars]
 ALLOWED_ORIGINS = "https://themindgameonline3-0-pages.pages.dev,http://localhost:3000,https://themindgame.app,https://the-mind-game.com,*.themindgameonline3-0-pages.pages.dev"
 PUBLIC_BASE_URL = "https://the-mind-game-worker.lmarogna02.workers.dev"
@@ -59,6 +63,10 @@ binding = "DB"
 database_name = "the-mind-game-leaderboard-preview"
 database_id = "3dd97588-a562-4b97-a5de-1fbcdedc6643"
 migrations_dir = "migrations"
+
+[[env.preview.analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "the-mind-game-events-preview"
 
 [env.preview.vars]
 ALLOWED_ORIGINS = "https://themindgameonline3-0-pages.pages.dev,http://localhost:3000,https://themindgame.app,https://the-mind-game.com,*.themindgameonline3-0-pages.pages.dev"

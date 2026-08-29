@@ -14,6 +14,9 @@ export interface Env {
   LOBBY_SERVER: DurableObjectNamespace<LobbyServer>;
   LOBBY_REGISTRY: DurableObjectNamespace<LobbyRegistry>;
   DB: D1Database;
+  // Workers Analytics Engine dataset for server-side gameplay events. Optional
+  // so a `wrangler dev` / test run without the binding is a no-op, not a crash.
+  ANALYTICS?: AnalyticsEngineDataset;
   ALLOWED_ORIGINS?: string;
   DISCORD_WEBHOOK_URL?: string;
   // Base URL this Worker is reachable at (used to build the one-click approve

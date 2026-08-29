@@ -17,12 +17,21 @@ export class PlayCardHandler extends WsMessageHandler {
             return;
         }
         const wasWon = lobbyServer.room.state === "won";
+        const wasLost = lobbyServer.room.state === "lost";
         lobbyServer.room.playCard(this.card);
         await lobbyServer.saveLobbyState();
         await lobbyServer.sendLobbyState();
 
         if (!wasWon && lobbyServer.room.state === "won") {
             await lobbyServer.onGameWon();
+        }
+
+        if (!wasLost && lobbyServer.room.state === "lost") {
+            lobbyServer.trackEvent("game_lost", {
+                playerCount: lobbyServer.room.players.length,
+                level: lobbyServer.room.currentLevel,
+                livesLostCount: lobbyServer.room.livesLostCount,
+            });
         }
     };
 }
