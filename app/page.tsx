@@ -84,6 +84,15 @@ export default function Home() {
           by <span className="italic text-[var(--text-strong)]">Wolfgang Warsch</span>
         </p>
 
+        {!hasJoinedLobby ? (
+          <p className="mt-4 max-w-xl text-base leading-relaxed text-[var(--text-muted)]">
+            The co-op card game where{" "}
+            <span className="font-semibold text-[var(--text-strong)]">2&ndash;4 players</span>{" "}
+            play their cards in ascending order &mdash; no talking, no signals,
+            no showing numbers. Just timing and trust.
+          </p>
+        ) : null}
+
         {hasJoinedLobby && lobbyId ? (
           <p className="mt-2 text-sm text-[var(--text-muted)]">
             Lobby code: {lobbyId}
