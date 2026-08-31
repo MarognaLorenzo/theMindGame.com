@@ -80,7 +80,9 @@ export default function Home() {
         <h1 className="text-3xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-4xl">
           The Mind
         </h1>
-        by <i> Wolfgang Warsch </i>
+        <p className="mt-1 text-sm text-[var(--text-muted)]">
+          by <span className="italic text-[var(--text-strong)]">Wolfgang Warsch</span>
+        </p>
 
         {hasJoinedLobby && lobbyId ? (
           <p className="mt-2 text-sm text-[var(--text-muted)]">
