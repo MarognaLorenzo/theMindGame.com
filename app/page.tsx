@@ -33,6 +33,7 @@ export default function Home() {
     leaderboardEligibility,
     leaderboardSubmitStatus,
     leaderboardSubmitError,
+    pending,
     createLobby,
     joinLobby,
     exitGame,
@@ -103,7 +104,11 @@ export default function Home() {
             ? "Focus mode on. Play cards directly from your hand."
             : hasJoinedLobby
               ? "Share the lobby code and start once everyone has joined."
-              : ONBOARDING_SUBTITLE[phase]}
+              : pending === "creating"
+                ? "Creating your lobby…"
+                : pending === "joining"
+                  ? "Connecting you to the lobby…"
+                  : ONBOARDING_SUBTITLE[phase]}
         </p>
 
         {showOnboarding ? (
@@ -112,6 +117,7 @@ export default function Home() {
             name={name}
             lobbyId={lobbyId}
             error={error}
+            pending={pending}
             onNameChange={setName}
             onLobbyIdChange={setLobbyId}
             onPhaseChange={setPhase}

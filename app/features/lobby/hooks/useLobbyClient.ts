@@ -26,6 +26,11 @@ interface LeaderboardSubmitErrorResponse {
 
 export type LeaderboardSubmitStatus = "idle" | "submitting" | "submitted" | "error";
 
+// Which pre-lobby action is currently in flight, so the onboarding UI can show a spinner
+// between the click and the lobby actually coming back. Cleared once a lobby arrives or the
+// attempt errors out.
+export type LobbyActionPending = "creating" | "joining" | null;
+
 // The pre-lobby onboarding is a small step machine rather than one all-at-once form:
 //  name   -> ask who the player is (every path needs this)
 //  choice -> create a lobby, or continue to the code step to join one
@@ -47,6 +52,7 @@ export function useLobbyClient() {
   const [leaderboardSubmitStatus, setLeaderboardSubmitStatus] =
     useState<LeaderboardSubmitStatus>("idle");
   const [leaderboardSubmitError, setLeaderboardSubmitError] = useState("");
+  const [pending, setPending] = useState<LobbyActionPending>(null);
 
   const workerBaseUrl =
     process.env.NEXT_PUBLIC_WORKER_URL?.trim() || DEFAULT_WORKER_URL;
@@ -81,6 +87,8 @@ export function useLobbyClient() {
       return;
     }
 
+    setPending("creating");
+
     try {
       const res = await fetch(`${workerBaseUrl}/api/create`, { method: "GET" });
       if (!res.ok) {
@@ -104,6 +112,7 @@ export function useLobbyClient() {
 
   function joinLobby() {
     setError("");
+    setPending("joining");
 
     const playerName = name.trim();
     const targetLobbyId = lobbyId.trim();
@@ -242,6 +251,12 @@ export function useLobbyClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // A pre-lobby action resolves either way: the lobby state lands (success) or an error
+  // surfaces. Derive the spinner state from that rather than racing to clear it in a
+  // callback — every entry point (`createLobby`, `joinLobby`, `connect`) resets `error`
+  // first, so a fresh attempt re-shows the spinner.
+  const activePending: LobbyActionPending = lobby || error ? null : pending;
+
   const isHost = Boolean(myPlayerId === lobby?.hostPlayerId);
 
   return {
@@ -261,6 +276,7 @@ export function useLobbyClient() {
     leaderboardEligibility,
     leaderboardSubmitStatus,
     leaderboardSubmitError,
+    pending: activePending,
     createLobby,
     joinLobby,
     disconnectSocket: (options?: DisconnectOptions) => controller.disconnect(options),
