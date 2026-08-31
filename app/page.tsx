@@ -95,8 +95,6 @@ export default function Home() {
               : ONBOARDING_SUBTITLE[phase]}
         </p>
 
-        {!hasJoinedLobby ? <LandingContent /> : null}
-
         {showOnboarding ? (
           <LobbyOnboarding
             phase={phase}
@@ -110,6 +108,8 @@ export default function Home() {
             onJoinLobby={joinLobby}
           />
         ) : null}
+
+        {!hasJoinedLobby ? <LandingContent /> : null}
 
         {shouldRenderGameStage && lobby ? (
           <>
