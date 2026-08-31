@@ -21,8 +21,12 @@ export function NameStep({ name, onNameChange, onContinue }: NameStepProps) {
           value={name}
           onChange={(e) => onNameChange(e.target.value)}
           autoComplete="nickname"
+          placeholder="e.g. Alex"
           className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-2)] px-3 py-3 text-base text-[var(--text-strong)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]"
         />
+        <span className="mt-1 block text-xs text-[var(--text-muted)]">
+          Shown to the other players in your lobby.
+        </span>
       </label>
 
       <button

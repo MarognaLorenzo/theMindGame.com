@@ -11,7 +11,7 @@ import type { LobbyPhase } from "./features/lobby/hooks/useLobbyClient";
 
 const ONBOARDING_SUBTITLE: Record<LobbyPhase, string> = {
   name: "Enter your name to get started.",
-  choice: "Create a new lobby, or join one with a code.",
+  choice: "You're all set — pick how you want to play.",
   code: "Enter the code a friend shared with you.",
   invite: "You've been invited to a lobby — just add your name.",
 };
@@ -77,7 +77,7 @@ export default function Home() {
       ) : null}
 
       <main className={mainClasses}>
-        <h1 className="text-3xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-4xl">
+        <h1 className="pr-28 text-3xl font-semibold tracking-tight text-[var(--text-strong)] sm:pr-0 sm:text-4xl">
           The Mind
         </h1>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
