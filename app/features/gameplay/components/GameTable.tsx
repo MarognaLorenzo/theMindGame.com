@@ -40,14 +40,16 @@ function OpponentSeat({ player }: { player: LobbyPlayer }) {
         )}
       </div>
 
-      <div className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[#3b4f6d]/65 bg-[#0f1e33]/75 px-2.5 py-1 text-xs text-[var(--text-strong)]">
+      <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-[#3b4f6d]/65 bg-[#0f1e33]/75 px-3 py-1 text-xs text-[var(--text-strong)]">
         <span className="text-[var(--text-muted)]">
-          <UserIcon className="h-3.5 w-3.5" />
+          <UserIcon className="h-4 w-4" />
         </span>
-        <span className="max-w-[6rem] truncate font-medium">{player.name}</span>
-        <span className="h-3 w-px bg-[#415b7f]" aria-hidden="true" />
+        <span className="max-w-[7rem] truncate text-sm font-medium sm:max-w-[10rem]">
+          {player.name}
+        </span>
+        <span className="h-3.5 w-px bg-[#415b7f]" aria-hidden="true" />
         <span
-          className="font-semibold tabular-nums text-[var(--accent)]"
+          className="text-sm font-semibold tabular-nums text-[var(--accent)]"
           aria-label={`${player.name}: ${player.handSize} cards in hand`}
         >
           {player.handSize}
@@ -68,9 +70,9 @@ function OpponentSeatRow({ opponents }: { opponents: LobbyPlayer[] }) {
 
   return (
     // Wraps to more rows rather than clipping or pushing the page wide when the
-    // seats don't fit (a phone with 3 opponents). The negative margin tucks the
-    // fans onto the felt's edge.
-    <ul className="relative z-10 -mb-4 flex w-full max-w-2xl flex-wrap items-end justify-center gap-x-6 gap-y-4 px-2 sm:-mb-5 sm:gap-x-8">
+    // seats don't fit (a phone with 3 opponents). Sits just clear of the felt's
+    // top edge so the opponents read as seated behind the table, not on it.
+    <ul className="relative z-10 mb-1.5 flex w-full max-w-2xl flex-wrap items-end justify-center gap-x-7 gap-y-4 px-2 sm:gap-x-10">
       {opponents.map((player) => (
         <li key={player.id} className="flex-none">
           <OpponentSeat player={player} />
