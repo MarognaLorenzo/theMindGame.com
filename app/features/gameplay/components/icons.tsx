@@ -15,9 +15,9 @@ export function ShurikenIcon({ className = "h-5 w-5" }: { className?: string } =
   );
 }
 
-export function UserIcon() {
+export function UserIcon({ className = "h-5 w-5" }: { className?: string } = {}) {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8">
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8">
       <circle cx="12" cy="8" r="3.2" />
       <path d="M5.5 19c.7-3 3.2-5 6.5-5s5.8 2 6.5 5" />
     </svg>
