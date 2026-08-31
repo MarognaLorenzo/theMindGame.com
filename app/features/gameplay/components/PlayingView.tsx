@@ -1,10 +1,10 @@
 import type { SocketLobbyState } from "../../lobby/types";
 import { useLifeShurikenAnnouncements } from "../hooks/useLifeShurikenAnnouncements";
 import { DiscardPile } from "./DiscardPile";
+import { GameTable } from "./GameTable";
 import { HeartIcon, ShurikenIcon } from "./icons";
 import { LevelCompleteOverlay } from "./LevelCompleteOverlay";
 import { LifeLossOverlay } from "./LifeLossOverlay";
-import { OpponentsList } from "./OpponentsList";
 import { PlayerHand } from "./PlayerHand";
 
 interface PlayingViewProps {
@@ -117,9 +117,7 @@ export function PlayingView({
         </div>
       </header>
 
-      <OpponentsList players={otherPlayers} />
-
-      <div className="relative mt-8 flex min-h-44 items-center justify-center">
+      <GameTable opponents={otherPlayers}>
         {completedLevelAnnouncement !== null && (
           <LevelCompleteOverlay
             tick={levelCompleteTick}
@@ -135,7 +133,7 @@ export function PlayingView({
         )}
 
         <DiscardPile cards={pilePreview} />
-      </div>
+      </GameTable>
 
       <div className="mt-auto pb-2">
         <div className="mt-4 overflow-x-auto px-2 pb-2">
