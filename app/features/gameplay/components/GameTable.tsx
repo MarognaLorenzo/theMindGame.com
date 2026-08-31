@@ -67,18 +67,16 @@ function OpponentSeatRow({ opponents }: { opponents: LobbyPlayer[] }) {
   }
 
   return (
-    // Centered while the seats fit; scrolls horizontally rather than clipping or
-    // pushing the page wide once there are too many for the viewport (same trick
-    // the hand uses). The negative margin tucks the fans onto the felt's edge.
-    <div className="relative z-10 -mb-4 w-full max-w-2xl overflow-x-auto sm:-mb-5">
-      <ul className="mx-auto flex w-max min-w-full items-end justify-center gap-x-4 px-2 sm:gap-x-7">
-        {opponents.map((player) => (
-          <li key={player.id} className="flex-none">
-            <OpponentSeat player={player} />
-          </li>
-        ))}
-      </ul>
-    </div>
+    // Wraps to more rows rather than clipping or pushing the page wide when the
+    // seats don't fit (a phone with 3 opponents). The negative margin tucks the
+    // fans onto the felt's edge.
+    <ul className="relative z-10 -mb-4 flex w-full max-w-2xl flex-wrap items-end justify-center gap-x-6 gap-y-4 px-2 sm:-mb-5 sm:gap-x-8">
+      {opponents.map((player) => (
+        <li key={player.id} className="flex-none">
+          <OpponentSeat player={player} />
+        </li>
+      ))}
+    </ul>
   );
 }
 
