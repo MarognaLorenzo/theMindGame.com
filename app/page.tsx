@@ -11,7 +11,7 @@ import type { LobbyPhase } from "./features/lobby/hooks/useLobbyClient";
 
 const ONBOARDING_SUBTITLE: Record<LobbyPhase, string> = {
   name: "Enter your name to get started.",
-  choice: "Create a new lobby, or join one with a code.",
+  choice: "You're all set — pick how you want to play.",
   code: "Enter the code a friend shared with you.",
   invite: "You've been invited to a lobby — just add your name.",
 };
@@ -33,6 +33,7 @@ export default function Home() {
     leaderboardEligibility,
     leaderboardSubmitStatus,
     leaderboardSubmitError,
+    pending,
     createLobby,
     joinLobby,
     exitGame,
@@ -77,10 +78,21 @@ export default function Home() {
       ) : null}
 
       <main className={mainClasses}>
-        <h1 className="text-3xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-4xl">
+        <h1 className="pr-28 text-3xl font-semibold tracking-tight text-[var(--text-strong)] sm:pr-0 sm:text-4xl">
           The Mind
         </h1>
-        by <i> Wolfgang Warsch </i>
+        <p className="mt-1 text-sm text-[var(--text-muted)]">
+          by <span className="italic text-[var(--text-strong)]">Wolfgang Warsch</span>
+        </p>
+
+        {!hasJoinedLobby ? (
+          <p className="mt-4 max-w-xl text-base leading-relaxed text-[var(--text-muted)]">
+            The co-op card game where{" "}
+            <span className="font-semibold text-[var(--text-strong)]">2&ndash;4 players</span>{" "}
+            play their cards in ascending order &mdash; no talking, no signals,
+            no showing numbers. Just timing and trust.
+          </p>
+        ) : null}
 
         {hasJoinedLobby && lobbyId ? (
           <p className="mt-2 text-sm text-[var(--text-muted)]">
@@ -92,10 +104,12 @@ export default function Home() {
             ? "Focus mode on. Play cards directly from your hand."
             : hasJoinedLobby
               ? "Share the lobby code and start once everyone has joined."
-              : ONBOARDING_SUBTITLE[phase]}
+              : pending === "creating"
+                ? "Creating your lobby…"
+                : pending === "joining"
+                  ? "Connecting you to the lobby…"
+                  : ONBOARDING_SUBTITLE[phase]}
         </p>
-
-        {!hasJoinedLobby ? <LandingContent /> : null}
 
         {showOnboarding ? (
           <LobbyOnboarding
@@ -103,6 +117,7 @@ export default function Home() {
             name={name}
             lobbyId={lobbyId}
             error={error}
+            pending={pending}
             onNameChange={setName}
             onLobbyIdChange={setLobbyId}
             onPhaseChange={setPhase}
@@ -110,6 +125,8 @@ export default function Home() {
             onJoinLobby={joinLobby}
           />
         ) : null}
+
+        {!hasJoinedLobby ? <LandingContent /> : null}
 
         {shouldRenderGameStage && lobby ? (
           <>

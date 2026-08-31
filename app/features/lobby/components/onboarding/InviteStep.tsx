@@ -1,6 +1,9 @@
+import { Spinner } from "./Spinner";
+
 interface InviteStepProps {
   name: string;
   lobbyId: string;
+  isJoining: boolean;
   onNameChange: (value: string) => void;
   onJoin: () => void;
   onUseDifferentLobby: () => void;
@@ -9,11 +12,12 @@ interface InviteStepProps {
 export function InviteStep({
   name,
   lobbyId,
+  isJoining,
   onNameChange,
   onJoin,
   onUseDifferentLobby,
 }: InviteStepProps) {
-  const canJoin = name.trim().length > 0;
+  const canJoin = name.trim().length > 0 && !isJoining;
 
   return (
     <form
@@ -38,22 +42,31 @@ export function InviteStep({
           value={name}
           onChange={(e) => onNameChange(e.target.value)}
           autoComplete="nickname"
-          className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-2)] px-3 py-3 text-base text-[var(--text-strong)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]"
+          disabled={isJoining}
+          className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-2)] px-3 py-3 text-base text-[var(--text-strong)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] disabled:opacity-60"
         />
       </label>
 
       <button
         type="submit"
         disabled={!canJoin}
-        className="min-h-11 w-full rounded-xl bg-[var(--accent)] px-4 py-2.5 font-semibold text-[#0a1712] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 sm:w-[min(100%,22rem)]"
+        className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 font-semibold text-[#0a1712] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 sm:w-[min(100%,22rem)]"
       >
-        Join lobby
+        {isJoining ? (
+          <>
+            <Spinner className="h-4 w-4" />
+            Joining&hellip;
+          </>
+        ) : (
+          "Join lobby"
+        )}
       </button>
 
       <button
         type="button"
         onClick={onUseDifferentLobby}
-        className="block text-sm text-[var(--text-muted)] underline underline-offset-2 transition hover:text-[var(--text-strong)]"
+        disabled={isJoining}
+        className="block text-sm text-[var(--text-muted)] underline underline-offset-2 transition hover:text-[var(--text-strong)] disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline"
       >
         Join a different lobby
       </button>

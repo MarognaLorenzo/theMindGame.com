@@ -1,4 +1,4 @@
-import type { LobbyPhase } from "../../hooks/useLobbyClient";
+import type { LobbyActionPending, LobbyPhase } from "../../hooks/useLobbyClient";
 import { ChoiceStep } from "./ChoiceStep";
 import { CodeStep } from "./CodeStep";
 import { InviteStep } from "./InviteStep";
@@ -9,6 +9,7 @@ interface LobbyOnboardingProps {
   name: string;
   lobbyId: string;
   error: string;
+  pending: LobbyActionPending;
   onNameChange: (value: string) => void;
   onLobbyIdChange: (value: string) => void;
   onPhaseChange: (phase: LobbyPhase) => void;
@@ -25,12 +26,16 @@ export function LobbyOnboarding({
   name,
   lobbyId,
   error,
+  pending,
   onNameChange,
   onLobbyIdChange,
   onPhaseChange,
   onCreateLobby,
   onJoinLobby,
 }: LobbyOnboardingProps) {
+  const isCreating = pending === "creating";
+  const isJoining = pending === "joining";
+
   return (
     <>
       {phase === "name" ? (
@@ -44,6 +49,7 @@ export function LobbyOnboarding({
       {phase === "choice" ? (
         <ChoiceStep
           name={name}
+          isCreating={isCreating}
           onCreate={onCreateLobby}
           onJoin={() => onPhaseChange("code")}
           onBack={() => onPhaseChange("name")}
@@ -53,6 +59,7 @@ export function LobbyOnboarding({
       {phase === "code" ? (
         <CodeStep
           lobbyId={lobbyId}
+          isJoining={isJoining}
           onLobbyIdChange={onLobbyIdChange}
           onJoin={onJoinLobby}
           onBack={() => onPhaseChange("choice")}
@@ -63,6 +70,7 @@ export function LobbyOnboarding({
         <InviteStep
           name={name}
           lobbyId={lobbyId}
+          isJoining={isJoining}
           onNameChange={onNameChange}
           onJoin={onJoinLobby}
           onUseDifferentLobby={() => onPhaseChange("name")}

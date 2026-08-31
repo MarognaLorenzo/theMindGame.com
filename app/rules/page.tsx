@@ -14,7 +14,7 @@ export const metadata: Metadata = {
     description:
       "Learn how to play The Mind online, including core rules, lives, shurikens, and win conditions.",
     url: `${SITE_URL}/rules`,
-    images: ["/og-image.svg"],
+    images: ["/og-image.png"],
   },
 };
 

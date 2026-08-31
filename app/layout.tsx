@@ -34,7 +34,7 @@ export const metadata: Metadata = {
     siteName: "The Mind Online",
     images: [
       {
-        url: "/og-image.svg",
+        url: "/og-image.png",
         width: 1200,
         height: 630,
         alt: "The Mind Online card game preview",
@@ -46,7 +46,7 @@ export const metadata: Metadata = {
     title: "The Mind Online",
     description:
       "Play The Mind online in your browser with a focused multiplayer lobby experience.",
-    images: ["/og-image.svg"],
+    images: ["/og-image.png"],
   },
   icons: {
     icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
