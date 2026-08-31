@@ -13,7 +13,7 @@ export function LandingIllustration() {
             Read The Table, Not The Numbers.
           </h2>
           <p className="mt-3 max-w-xl text-sm leading-relaxed text-[var(--text-muted)] sm:text-[0.95rem]">
-            No voice calls, no value hints. Only timing, trust, and team rhythm. Create a lobby and discover whether your group can stay in sync.
+            Every player sees only their own hand. The whole team has to feel the same rhythm.
           </p>
         </div>
 
