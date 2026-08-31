@@ -26,10 +26,17 @@ interface LeaderboardSubmitErrorResponse {
 
 export type LeaderboardSubmitStatus = "idle" | "submitting" | "submitted" | "error";
 
+// The pre-lobby onboarding is a small step machine rather than one all-at-once form:
+//  name   -> ask who the player is (every path needs this)
+//  choice -> create a lobby, or continue to the code step to join one
+//  code   -> type/paste a lobby code, then join
+//  invite -> arrived via a ?lobby=CODE link: room is known, only the name is missing
+export type LobbyPhase = "name" | "choice" | "code" | "invite";
+
 export function useLobbyClient() {
   const [name, setName] = useState("");
   const [lobbyId, setLobbyId] = useState("");
-  const [lobbyFlow, setLobbyFlow] = useState<"create" | "join">("create");
+  const [phase, setPhase] = useState<LobbyPhase>("name");
   const [status, setStatus] = useState("Ready");
   const [error, setError] = useState("");
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
@@ -205,7 +212,7 @@ export function useLobbyClient() {
         // the "cascading renders" issue this rule normally warns about.
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setLobbyId(linkedLobbyId);
-        setLobbyFlow("join");
+        setPhase("invite");
         setStatus("Ready");
         return;
       }
@@ -242,8 +249,8 @@ export function useLobbyClient() {
     setName,
     lobbyId,
     setLobbyId,
-    lobbyFlow,
-    setLobbyFlow,
+    phase,
+    setPhase,
     status,
     error,
     myPlayerId,

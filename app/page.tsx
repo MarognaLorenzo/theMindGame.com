@@ -5,9 +5,16 @@ import { GameStageRouter } from "./features/gameplay/components/GameStageRouter"
 import { LandingContent } from "./features/landing/components/LandingContent";
 import { gameSchema } from "./features/landing/gameSchema";
 import { LeaderboardModal } from "./features/leaderboard/components/LeaderboardModal";
-import { LobbyActionButtons } from "./features/lobby/components/LobbyActionButtons";
-import { LobbySetupForm } from "./features/lobby/components/LobbySetupForm";
+import { LobbyOnboarding } from "./features/lobby/components/onboarding/LobbyOnboarding";
 import { useLobbyClient } from "./features/lobby/hooks/useLobbyClient";
+import type { LobbyPhase } from "./features/lobby/hooks/useLobbyClient";
+
+const ONBOARDING_SUBTITLE: Record<LobbyPhase, string> = {
+  name: "Enter your name to get started.",
+  choice: "Create a new lobby, or join one with a code.",
+  code: "Enter the code a friend shared with you.",
+  invite: "You've been invited to a lobby — just add your name.",
+};
 
 export default function Home() {
   const {
@@ -15,8 +22,8 @@ export default function Home() {
     setName,
     lobbyId,
     setLobbyId,
-    lobbyFlow,
-    setLobbyFlow,
+    phase,
+    setPhase,
     error,
     myPlayerId,
     lobby,
@@ -38,7 +45,9 @@ export default function Home() {
   const isPlaying = lobby?.state === "playing";
   const hasJoinedLobby = Boolean(lobby);
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
-  const showLobbyControls = !isPlaying;
+  // Onboarding and the game stage are mutually exclusive: the moment a lobby exists we hand
+  // the whole surface to GameStageRouter (waiting room, then play).
+  const showOnboarding = !hasJoinedLobby;
   const shouldRenderGameStage = Boolean(lobby);
   const mainClasses = isPlaying
     ? "mx-auto w-full max-w-4xl p-0"
@@ -73,38 +82,33 @@ export default function Home() {
         </h1>
         by <i> Wolfgang Warsch </i>
 
-        {lobbyId ?
-        <p className="mt-2 text-sm text-[var(--text-muted)]">
-          Lobby code: {lobbyId}
-        </p>
-        : null}
+        {hasJoinedLobby && lobbyId ? (
+          <p className="mt-2 text-sm text-[var(--text-muted)]">
+            Lobby code: {lobbyId}
+          </p>
+        ) : null}
         <p className="mt-2 text-sm text-[var(--text-muted)]">
           {isPlaying
             ? "Focus mode on. Play cards directly from your hand."
-            : "Enter your name, create a lobby, or join an existing one."}
+            : hasJoinedLobby
+              ? "Share the lobby code and start once everyone has joined."
+              : ONBOARDING_SUBTITLE[phase]}
         </p>
 
         {!hasJoinedLobby ? <LandingContent /> : null}
 
-        {showLobbyControls ? (
-          <>
-            <LobbySetupForm
-              name={name}
-              lobbyId={lobbyId}
-              showLobbyIdField={lobbyFlow === "join"}
-              onNameChange={setName}
-              onLobbyIdChange={setLobbyId}
-            />
-
-            <LobbyActionButtons
-              flow={lobbyFlow}
-              onFlowChange={setLobbyFlow}
-              onCreateLobby={createLobby}
-              onJoinLobby={joinLobby}
-            />
-
-            {error ? (<p className="mt-1 text-sm text-[#ff8f8f]">Error: {error}</p>) : null}
-          </>
+        {showOnboarding ? (
+          <LobbyOnboarding
+            phase={phase}
+            name={name}
+            lobbyId={lobbyId}
+            error={error}
+            onNameChange={setName}
+            onLobbyIdChange={setLobbyId}
+            onPhaseChange={setPhase}
+            onCreateLobby={createLobby}
+            onJoinLobby={joinLobby}
+          />
         ) : null}
 
         {shouldRenderGameStage && lobby ? (
