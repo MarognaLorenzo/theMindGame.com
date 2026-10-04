@@ -17,6 +17,10 @@ export type LeaderboardSubmitResult =
 // Max stored length of a submitted team name; longer names are truncated.
 export const MAX_TEAM_NAME_LENGTH = 30;
 
+// How many approved entries the public leaderboard shows per team size. Also
+// the cut-off review uses to prioritise pending entries that would be visible.
+export const LEADERBOARD_READ_LIMIT = 100;
+
 // How long a win stays eligible for leaderboard submission.
 export const LEADERBOARD_TOKEN_TTL_MS = 5 * 60 * 1000;
 

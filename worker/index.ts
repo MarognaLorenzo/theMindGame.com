@@ -4,10 +4,13 @@ import { createLobby, joinLobby } from "./api/lobbyOperations.ts";
 import {
   getLeaderboard,
   renderReviewConfirmation,
+  renderReviewQueue,
   submitLeaderboardEntry,
   approveLeaderboardEntry,
   denyLeaderboardEntry,
 } from "./api/leaderboard/leaderboardOperations.ts";
+import { fetchReviewQueue } from "./api/leaderboard/reviewQueue.ts";
+import { sendReviewDigest } from "./api/leaderboard/reviewNotifier.ts";
 import { Responder } from "./api/utils/responder.ts";
 
 export interface Env {
@@ -65,6 +68,10 @@ const worker = {
         return await renderReviewConfirmation(request, env, responder);
       }
 
+      if (path === "/api/leaderboard/review-queue" && request.method === "GET") {
+        return await renderReviewQueue(request, env, responder);
+      }
+
       if (path === "/api/leaderboard/approve" && request.method === "POST") {
         return await approveLeaderboardEntry(request, env, responder);
       }
@@ -77,7 +84,21 @@ const worker = {
       console.error("Unhandled error in worker fetch:", err);
       return responder.respondWithError("Internal Server Error", 500);
     }
-  }
+  },
+
+  // Cron trigger (see [triggers] in wrangler.toml): the daily leaderboard
+  // review digest.
+  async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
+    const queue = await fetchReviewQueue(env.DB);
+    await sendReviewDigest(
+      {
+        webhookUrl: env.DISCORD_WEBHOOK_URL,
+        publicBaseUrl: env.PUBLIC_BASE_URL,
+        approvalKey: env.REVIEW_APPROVAL_KEY,
+      },
+      queue,
+    );
+  },
 };
 
 export default worker;

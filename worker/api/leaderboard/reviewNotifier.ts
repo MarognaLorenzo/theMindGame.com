@@ -1,45 +1,44 @@
-// Optional: pings a Discord webhook whenever a submission lands as 'pending',
-// so moderation doesn't require polling the database. Configured per
-// environment via the DISCORD_WEBHOOK_URL secret (never a plain [vars] entry -
-// it's a bearer credential for posting into the channel); environments
-// without it configured (e.g. production, for now) silently skip this.
-interface PendingSubmissionNotice {
-  id: number;
-  teamName: string;
-  countryCode: string;
-  playerCount: number;
-  finalSeconds: number;
-}
+import { LEADERBOARD_READ_LIMIT } from "./leaderboardTypes.ts";
+import { PendingReviewEntry } from "./reviewQueue.ts";
 
+// Optional: posts one daily Discord message summarising what's waiting for
+// review (run from the Worker's cron trigger), so moderation doesn't require
+// polling the database - and doesn't ping once per submission either.
+// Configured per environment via the DISCORD_WEBHOOK_URL secret (never a plain
+// [vars] entry - it's a bearer credential for posting into the channel);
+// environments without it configured silently skip this.
 export interface ReviewNotifierConfig {
   webhookUrl: string | undefined;
-  // Both required to include the one-click approve link; either missing
-  // falls back to a raw SQL statement so review is still possible.
+  // Both required to include the review-queue link; either missing falls back
+  // to a raw SQL statement so review is still possible.
   publicBaseUrl: string | undefined;
   approvalKey: string | undefined;
 }
 
-export async function notifyPendingSubmission(
+export async function sendReviewDigest(
   config: ReviewNotifierConfig,
-  entry: PendingSubmissionNotice,
+  queue: PendingReviewEntry[],
 ): Promise<void> {
   const { webhookUrl, publicBaseUrl, approvalKey } = config;
-  if (!webhookUrl) {
+  if (!webhookUrl || queue.length === 0) {
     return;
   }
+
+  const onBoard = queue.filter((entry) => entry.makesBoard).length;
+  const offBoard = queue.length - onBoard;
 
   const actionLine =
     publicBaseUrl && approvalKey
       ? // Wrapped in <> so Discord's own link-preview crawler doesn't pre-fetch
-        // (and thereby land on, though not mutate - GET is confirm-only, with
-        // both approve/deny as explicit buttons on that page) it.
-        `Review: <${publicBaseUrl}/api/leaderboard/review?id=${entry.id}&key=${encodeURIComponent(approvalKey)}>`
-      : `Approve: \`UPDATE leaderboard SET status='approved' WHERE id=${entry.id};\` ` +
-        `/ Deny: \`UPDATE leaderboard SET status='rejected' WHERE id=${entry.id};\``;
+        // it (harmless anyway - the queue page is read-only on GET, every
+        // approve/deny is an explicit button POST).
+        `Review: <${publicBaseUrl}/api/leaderboard/review-queue?key=${encodeURIComponent(approvalKey)}>`
+      : "Review: `SELECT * FROM leaderboard WHERE status='pending';`";
 
   const content =
-    `🔔 New leaderboard submission needs review\n` +
-    `**${entry.teamName}** (${entry.countryCode}) - ${entry.playerCount} players, ${entry.finalSeconds.toFixed(1)}s\n` +
+    `📋 **${queue.length}** leaderboard ${queue.length === 1 ? "entry needs" : "entries need"} review\n` +
+    `🏆 ${onBoard} would make the top ${LEADERBOARD_READ_LIMIT} - review these first\n` +
+    `▫️ ${offBoard} wouldn't\n` +
     actionLine;
 
   try {
@@ -52,7 +51,6 @@ export async function notifyPendingSubmission(
       console.error(`Review webhook returned ${response.status}`);
     }
   } catch (err) {
-    // A notification failure must never affect the actual submission.
-    console.error("Failed to notify review webhook:", err);
+    console.error("Failed to send review digest:", err);
   }
 }

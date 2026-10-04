@@ -1,5 +1,7 @@
 import { Env, LobbyRegistry } from "../../index.ts";
 import { Responder } from "../utils/responder.ts";
+import { LEADERBOARD_READ_LIMIT } from "./leaderboardTypes.ts";
+import { fetchReviewQueue, PendingReviewEntry } from "./reviewQueue.ts";
 
 // Public read model for a single leaderboard row.
 interface LeaderboardRow {
@@ -12,7 +14,6 @@ interface LeaderboardRow {
   created_at: string;
 }
 
-const LEADERBOARD_READ_LIMIT = 100;
 const VALID_PLAYER_COUNTS = [2, 3, 4];
 
 // POST /api/leaderboard/submit
@@ -119,9 +120,28 @@ function renderPage(body: string): string {
 <style>
   body { font-family: system-ui, sans-serif; background: #0e141b; color: #eff3f8; display: flex; min-height: 100vh; align-items: center; justify-content: center; margin: 0; padding: 1.5rem; }
   .card { max-width: 24rem; text-align: center; }
+  .card.wide { max-width: 40rem; width: 100%; text-align: left; align-self: flex-start; }
   button { margin-top: 1rem; padding: 0.75rem 1.5rem; border-radius: 0.75rem; border: none; background: #7ce4c0; color: #0a1712; font-weight: 600; font-size: 1rem; cursor: pointer; }
+  .deny { background: #f08f8f; }
+  .queue { list-style: none; padding: 0; margin: 0 0 2rem; }
+  .queue li { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; padding: 0.75rem 0; border-bottom: 1px solid #ffffff1a; }
+  .queue .meta { color: #9aa7b5; font-size: 0.875rem; }
+  .queue .actions { display: flex; gap: 0.5rem; }
+  .queue button { margin-top: 0; padding: 0.5rem 1rem; font-size: 0.875rem; }
 </style>
-</head><body><div class="card">${body}</div></body></html>`;
+</head><body>${body}</body></html>`;
+}
+
+function renderCard(body: string): string {
+  return renderPage(`<div class="card">${body}</div>`);
+}
+
+function isValidReviewKey(key: string | null, env: Env): key is string {
+  return Boolean(env.REVIEW_APPROVAL_KEY) && key === env.REVIEW_APPROVAL_KEY;
+}
+
+function reviewQueuePath(key: string): string {
+  return `/api/leaderboard/review-queue?key=${encodeURIComponent(key)}`;
 }
 
 interface ReviewRequestParams {
@@ -140,7 +160,7 @@ function parseReviewParams(url: URL, env: Env, responder: Responder): ReviewRequ
   if (!Number.isInteger(id) || id <= 0) {
     return responder.respondInvalidField("id", "must be a positive integer");
   }
-  if (!env.REVIEW_APPROVAL_KEY || key !== env.REVIEW_APPROVAL_KEY) {
+  if (!isValidReviewKey(key, env)) {
     return responder.respondWithError("Invalid or missing key", 403);
   }
 
@@ -181,19 +201,19 @@ export async function renderReviewConfirmation(
     }>();
 
   if (!row) {
-    return responder.respondWithHtml(renderPage(`<p>No leaderboard entry with id ${params.id}.</p>`), 404);
+    return responder.respondWithHtml(renderCard(`<p>No leaderboard entry with id ${params.id}.</p>`), 404);
   }
 
   const outcomeLabel = REVIEW_OUTCOME_LABELS[row.status];
   if (outcomeLabel) {
     return responder.respondWithHtml(
-      renderPage(`<p>"${escapeHtml(row.team_name)}" was already ${outcomeLabel}.</p>`),
+      renderCard(`<p>"${escapeHtml(row.team_name)}" was already ${outcomeLabel}.</p>`),
     );
   }
 
   const query = `id=${params.id}&key=${encodeURIComponent(params.key)}`;
   return responder.respondWithHtml(
-    renderPage(`
+    renderCard(`
       <p>Review this leaderboard entry:</p>
       <p><strong>${escapeHtml(row.team_name)}</strong> (${escapeHtml(row.country_code)})<br>
       ${row.player_count} players · ${row.final_seconds.toFixed(1)}s</p>
@@ -202,7 +222,7 @@ export async function renderReviewConfirmation(
           <button type="submit">Approve</button>
         </form>
         <form method="POST" action="/api/leaderboard/deny?${query}">
-          <button type="submit" style="background:#f08f8f;">Deny</button>
+          <button type="submit" class="deny">Deny</button>
         </form>
       </div>
     `),
@@ -227,14 +247,75 @@ async function resolveReview(
     .bind(targetStatus, params.id)
     .run();
 
+  // Actions taken from the review queue go straight back to it, so the whole
+  // queue can be worked through in one sitting. 303 turns the POST into a GET.
+  if (url.searchParams.get("from") === "queue") {
+    return new Response(null, {
+      status: 303,
+      headers: { Location: reviewQueuePath(params.key) },
+    });
+  }
+
   if (result.meta.changes === 0) {
     return responder.respondWithHtml(
-      renderPage(`<p>Nothing to do - entry ${params.id} was not pending (already reviewed, or doesn't exist).</p>`),
+      renderCard(`<p>Nothing to do - entry ${params.id} was not pending (already reviewed, or doesn't exist).</p>`),
     );
   }
 
   return responder.respondWithHtml(
-    renderPage(`<p>${REVIEW_OUTCOME_LABELS[targetStatus]} entry ${params.id}.</p>`),
+    renderCard(`<p>${REVIEW_OUTCOME_LABELS[targetStatus]} entry ${params.id}.</p>`),
+  );
+}
+
+function renderQueueSection(title: string, entries: PendingReviewEntry[], key: string): string {
+  if (entries.length === 0) {
+    return "";
+  }
+  const rows = entries
+    .map((entry) => {
+      const query = `id=${entry.id}&key=${encodeURIComponent(key)}&from=queue`;
+      return `
+        <li>
+          <div>
+            <strong>${escapeHtml(entry.team_name)}</strong> (${escapeHtml(entry.country_code)})<br>
+            <span class="meta">${entry.player_count} players · ${entry.final_seconds.toFixed(1)}s · ${escapeHtml(entry.created_at)} UTC</span>
+          </div>
+          <div class="actions">
+            <form method="POST" action="/api/leaderboard/approve?${query}"><button type="submit">Approve</button></form>
+            <form method="POST" action="/api/leaderboard/deny?${query}"><button type="submit" class="deny">Deny</button></form>
+          </div>
+        </li>`;
+    })
+    .join("");
+  return `<h2>${title} (${entries.length})</h2><ul class="queue">${rows}</ul>`;
+}
+
+// GET /api/leaderboard/review-queue?key - every pending entry on one page,
+// those that would make the public board first. Read-only like the single
+// review page: each Approve/Deny is its own POST form.
+export async function renderReviewQueue(
+  request: Request,
+  env: Env,
+  responder: Responder,
+): Promise<Response> {
+  const key = new URL(request.url).searchParams.get("key");
+  if (!isValidReviewKey(key, env)) {
+    return responder.respondWithError("Invalid or missing key", 403);
+  }
+
+  const queue = await fetchReviewQueue(env.DB);
+  if (queue.length === 0) {
+    return responder.respondWithHtml(renderCard("<p>Nothing to review - the queue is empty. 🎉</p>"));
+  }
+
+  return responder.respondWithHtml(
+    renderPage(`
+      <div class="card wide">
+        <h1>Leaderboard review</h1>
+        ${renderQueueSection(`🏆 Would make the top ${LEADERBOARD_READ_LIMIT}`, queue.filter((e) => e.makesBoard), key)}
+        ${renderQueueSection(`Wouldn't make the top ${LEADERBOARD_READ_LIMIT}`, queue.filter((e) => !e.makesBoard), key)}
+      </div>
+    `),
   );
 }
 

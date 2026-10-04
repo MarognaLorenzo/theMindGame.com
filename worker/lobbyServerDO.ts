@@ -17,7 +17,6 @@ import {
 import { normalizeCountryCode } from "./api/leaderboard/countryCodes.ts";
 import { isTeamNameAllowed } from "./api/leaderboard/teamNameFilter.ts";
 import { isPreviouslyApprovedTeamName } from "./api/leaderboard/knownTeamNames.ts";
-import { notifyPendingSubmission } from "./api/leaderboard/reviewNotifier.ts";
 import { AnalyticsEventName, AnalyticsFields, track } from "./analytics/track.ts";
 
 export class LobbyServer extends DurableObject<Env> {
@@ -263,7 +262,8 @@ export class LobbyServer extends DurableObject<Env> {
 
     const autoApproved = await isPreviouslyApprovedTeamName(this.env.DB, cleanName);
 
-    const insertResult = await this.env.DB.prepare(
+    // Anything left pending is picked up by the daily review digest.
+    await this.env.DB.prepare(
       `INSERT INTO leaderboard
          (team_name, country_code, player_count, final_seconds,
           lives_lost_count, shurikens_used_count, lobby_short_code, status)
@@ -280,25 +280,6 @@ export class LobbyServer extends DurableObject<Env> {
         autoApproved ? "approved" : "pending",
       )
       .run();
-
-    if (autoApproved) {
-      return { ok: true };
-    }
-
-    await notifyPendingSubmission(
-      {
-        webhookUrl: this.env.DISCORD_WEBHOOK_URL,
-        publicBaseUrl: this.env.PUBLIC_BASE_URL,
-        approvalKey: this.env.REVIEW_APPROVAL_KEY,
-      },
-      {
-        id: insertResult.meta.last_row_id,
-        teamName: cleanName,
-        countryCode: cleanCountry,
-        playerCount,
-        finalSeconds,
-      },
-    );
 
     return { ok: true };
   }
