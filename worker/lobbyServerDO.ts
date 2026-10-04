@@ -15,6 +15,7 @@ import {
   MAX_TEAM_NAME_LENGTH,
 } from "./api/leaderboard/leaderboardTypes.ts";
 import { normalizeCountryCode } from "./api/leaderboard/countryCodes.ts";
+import { isTeamNameAllowed } from "./api/leaderboard/teamNameFilter.ts";
 import { notifyPendingSubmission } from "./api/leaderboard/reviewNotifier.ts";
 import { AnalyticsEventName, AnalyticsFields, track } from "./analytics/track.ts";
 
@@ -231,6 +232,15 @@ export class LobbyServer extends DurableObject<Env> {
       return { ok: false, error: "A team name is required.", status: 400 };
     }
     const cleanName = trimmedName.slice(0, MAX_TEAM_NAME_LENGTH);
+    // Checked before the token is marked used, so a rejected name leaves the
+    // team free to retry with a different one inside the same window.
+    if (!isTeamNameAllowed(cleanName)) {
+      return {
+        ok: false,
+        error: "That team name isn't allowed - please pick a different one.",
+        status: 422,
+      };
+    }
 
     const cleanCountry = normalizeCountryCode(countryCode);
     if (!cleanCountry) {
