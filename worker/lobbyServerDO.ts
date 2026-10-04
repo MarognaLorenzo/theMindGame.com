@@ -16,6 +16,7 @@ import {
 } from "./api/leaderboard/leaderboardTypes.ts";
 import { normalizeCountryCode } from "./api/leaderboard/countryCodes.ts";
 import { isTeamNameAllowed } from "./api/leaderboard/teamNameFilter.ts";
+import { isPreviouslyApprovedTeamName } from "./api/leaderboard/knownTeamNames.ts";
 import { notifyPendingSubmission } from "./api/leaderboard/reviewNotifier.ts";
 import { AnalyticsEventName, AnalyticsFields, track } from "./analytics/track.ts";
 
@@ -260,11 +261,13 @@ export class LobbyServer extends DurableObject<Env> {
     const { finalSeconds, livesLostCount, shurikensUsedCount, playerCount } =
       record.stats;
 
+    const autoApproved = await isPreviouslyApprovedTeamName(this.env.DB, cleanName);
+
     const insertResult = await this.env.DB.prepare(
       `INSERT INTO leaderboard
          (team_name, country_code, player_count, final_seconds,
           lives_lost_count, shurikens_used_count, lobby_short_code, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     )
       .bind(
         cleanName,
@@ -274,8 +277,13 @@ export class LobbyServer extends DurableObject<Env> {
         livesLostCount,
         shurikensUsedCount,
         shortCode || null,
+        autoApproved ? "approved" : "pending",
       )
       .run();
+
+    if (autoApproved) {
+      return { ok: true };
+    }
 
     await notifyPendingSubmission(
       {
