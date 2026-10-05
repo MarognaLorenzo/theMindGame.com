@@ -1,4 +1,4 @@
-import { LEADERBOARD_READ_LIMIT } from "./leaderboardTypes.ts";
+import { LEADERBOARD_READ_LIMIT } from "../leaderboardTypes.ts";
 
 export interface PendingReviewEntry {
   id: number;

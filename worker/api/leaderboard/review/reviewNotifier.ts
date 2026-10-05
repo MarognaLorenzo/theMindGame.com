@@ -1,4 +1,4 @@
-import { LEADERBOARD_READ_LIMIT } from "./leaderboardTypes.ts";
+import { LEADERBOARD_READ_LIMIT } from "../leaderboardTypes.ts";
 import { PendingReviewEntry } from "./reviewQueue.ts";
 
 // Optional: posts one daily Discord message summarising what's waiting for

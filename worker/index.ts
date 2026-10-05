@@ -1,17 +1,16 @@
 import { LobbyServer } from "./lobbyServerDO.ts";
 import { LobbyRegistry } from "./lobbyRegistryDO.ts";
 import { createLobby, joinLobby } from "./api/lobbyOperations.ts";
+import { getLeaderboard, submitLeaderboardEntry } from "./api/leaderboard/leaderboardOperations.ts";
 import {
-  getLeaderboard,
-  renderReviewConfirmation,
-  renderReviewQueue,
-  submitLeaderboardEntry,
   approveLeaderboardEntry,
   denyLeaderboardEntry,
   removeLeaderboardEntry,
-} from "./api/leaderboard/leaderboardOperations.ts";
-import { fetchReviewQueue } from "./api/leaderboard/reviewQueue.ts";
-import { sendReviewDigest } from "./api/leaderboard/reviewNotifier.ts";
+} from "./api/leaderboard/review/reviewActions.ts";
+import { renderReviewConfirmation } from "./api/leaderboard/review/reviewEntryPage.ts";
+import { renderReviewQueue } from "./api/leaderboard/review/reviewQueuePage.ts";
+import { fetchReviewQueue } from "./api/leaderboard/review/reviewQueue.ts";
+import { sendReviewDigest } from "./api/leaderboard/review/reviewNotifier.ts";
 import { Responder } from "./api/utils/responder.ts";
 
 export interface Env {
