@@ -1,13 +1,15 @@
 import { LobbyServer } from "./lobbyServerDO.ts";
 import { LobbyRegistry } from "./lobbyRegistryDO.ts";
 import { createLobby, joinLobby } from "./api/lobbyOperations.ts";
+import { getLeaderboard, submitLeaderboardEntry } from "./api/leaderboard/leaderboardOperations.ts";
 import {
-  getLeaderboard,
-  renderReviewConfirmation,
-  submitLeaderboardEntry,
   approveLeaderboardEntry,
   denyLeaderboardEntry,
-} from "./api/leaderboard/leaderboardOperations.ts";
+  removeLeaderboardEntry,
+} from "./api/leaderboard/review/reviewActions.ts";
+import { renderReviewQueue } from "./api/leaderboard/review/reviewQueuePage.ts";
+import { fetchReviewQueue } from "./api/leaderboard/review/reviewQueue.ts";
+import { sendReviewDigest } from "./api/leaderboard/review/reviewNotifier.ts";
 import { Responder } from "./api/utils/responder.ts";
 
 export interface Env {
@@ -61,8 +63,8 @@ const worker = {
         return await getLeaderboard(request, env, responder);
       }
 
-      if (path === "/api/leaderboard/review" && request.method === "GET") {
-        return await renderReviewConfirmation(request, env, responder);
+      if (path === "/api/leaderboard/review-queue" && request.method === "GET") {
+        return await renderReviewQueue(request, env, responder);
       }
 
       if (path === "/api/leaderboard/approve" && request.method === "POST") {
@@ -72,12 +74,30 @@ const worker = {
       if (path === "/api/leaderboard/deny" && request.method === "POST") {
         return await denyLeaderboardEntry(request, env, responder);
       }
+
+      if (path === "/api/leaderboard/remove" && request.method === "POST") {
+        return await removeLeaderboardEntry(request, env, responder);
+      }
       return responder.respondWithError("Not Found", 404);
     } catch (err) {
       console.error("Unhandled error in worker fetch:", err);
       return responder.respondWithError("Internal Server Error", 500);
     }
-  }
+  },
+
+  // Cron trigger (see [triggers] in wrangler.toml): the daily leaderboard
+  // review digest.
+  async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
+    const queue = await fetchReviewQueue(env.DB);
+    await sendReviewDigest(
+      {
+        webhookUrl: env.DISCORD_WEBHOOK_URL,
+        publicBaseUrl: env.PUBLIC_BASE_URL,
+        approvalKey: env.REVIEW_APPROVAL_KEY,
+      },
+      queue,
+    );
+  },
 };
 
 export default worker;

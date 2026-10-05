@@ -28,6 +28,11 @@ migrations_dir = "migrations"
 binding = "ANALYTICS"
 dataset = "the-mind-game-events"
 
+# Daily leaderboard review digest. Cron is UTC-only: 18:00 UTC is 20:00 in
+# Italy during summer time (CEST) and 19:00 in winter (CET).
+[triggers]
+crons = ["0 18 * * *"]
+
 [vars]
 ALLOWED_ORIGINS = "https://themindgameonline3-0-pages.pages.dev,http://localhost:3000,https://themindgame.app,https://the-mind-game.com,*.themindgameonline3-0-pages.pages.dev"
 PUBLIC_BASE_URL = "https://the-mind-game-worker.lmarogna02.workers.dev"
@@ -67,6 +72,11 @@ migrations_dir = "migrations"
 [[env.preview.analytics_engine_datasets]]
 binding = "ANALYTICS"
 dataset = "the-mind-game-events-preview"
+
+# No scheduled digest on preview - trigger it by hand when testing
+# (`wrangler dev --test-scheduled`, then GET /__scheduled).
+[env.preview.triggers]
+crons = []
 
 [env.preview.vars]
 ALLOWED_ORIGINS = "https://themindgameonline3-0-pages.pages.dev,http://localhost:3000,https://themindgame.app,https://the-mind-game.com,*.themindgameonline3-0-pages.pages.dev"

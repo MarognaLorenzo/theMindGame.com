@@ -15,7 +15,8 @@ import {
   MAX_TEAM_NAME_LENGTH,
 } from "./api/leaderboard/leaderboardTypes.ts";
 import { normalizeCountryCode } from "./api/leaderboard/countryCodes.ts";
-import { notifyPendingSubmission } from "./api/leaderboard/reviewNotifier.ts";
+import { isTeamNameAllowed } from "./api/leaderboard/teamNameFilter.ts";
+import { isPreviouslyApprovedTeamName } from "./api/leaderboard/knownTeamNames.ts";
 import { AnalyticsEventName, AnalyticsFields, track } from "./analytics/track.ts";
 
 export class LobbyServer extends DurableObject<Env> {
@@ -231,6 +232,15 @@ export class LobbyServer extends DurableObject<Env> {
       return { ok: false, error: "A team name is required.", status: 400 };
     }
     const cleanName = trimmedName.slice(0, MAX_TEAM_NAME_LENGTH);
+    // Checked before the token is marked used, so a rejected name leaves the
+    // team free to retry with a different one inside the same window.
+    if (!isTeamNameAllowed(cleanName)) {
+      return {
+        ok: false,
+        error: "That team name isn't allowed - please pick a different one.",
+        status: 422,
+      };
+    }
 
     const cleanCountry = normalizeCountryCode(countryCode);
     if (!cleanCountry) {
@@ -250,11 +260,14 @@ export class LobbyServer extends DurableObject<Env> {
     const { finalSeconds, livesLostCount, shurikensUsedCount, playerCount } =
       record.stats;
 
-    const insertResult = await this.env.DB.prepare(
+    const autoApproved = await isPreviouslyApprovedTeamName(this.env.DB, cleanName);
+
+    // Anything left pending is picked up by the daily review digest.
+    await this.env.DB.prepare(
       `INSERT INTO leaderboard
          (team_name, country_code, player_count, final_seconds,
           lives_lost_count, shurikens_used_count, lobby_short_code, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     )
       .bind(
         cleanName,
@@ -264,23 +277,9 @@ export class LobbyServer extends DurableObject<Env> {
         livesLostCount,
         shurikensUsedCount,
         shortCode || null,
+        autoApproved ? "approved" : "pending",
       )
       .run();
-
-    await notifyPendingSubmission(
-      {
-        webhookUrl: this.env.DISCORD_WEBHOOK_URL,
-        publicBaseUrl: this.env.PUBLIC_BASE_URL,
-        approvalKey: this.env.REVIEW_APPROVAL_KEY,
-      },
-      {
-        id: insertResult.meta.last_row_id,
-        teamName: cleanName,
-        countryCode: cleanCountry,
-        playerCount,
-        finalSeconds,
-      },
-    );
 
     return { ok: true };
   }
