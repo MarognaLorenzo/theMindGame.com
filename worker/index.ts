@@ -7,7 +7,6 @@ import {
   denyLeaderboardEntry,
   removeLeaderboardEntry,
 } from "./api/leaderboard/review/reviewActions.ts";
-import { renderReviewConfirmation } from "./api/leaderboard/review/reviewEntryPage.ts";
 import { renderReviewQueue } from "./api/leaderboard/review/reviewQueuePage.ts";
 import { fetchReviewQueue } from "./api/leaderboard/review/reviewQueue.ts";
 import { sendReviewDigest } from "./api/leaderboard/review/reviewNotifier.ts";
@@ -62,10 +61,6 @@ const worker = {
 
       if (path === "/api/leaderboard" && request.method === "GET") {
         return await getLeaderboard(request, env, responder);
-      }
-
-      if (path === "/api/leaderboard/review" && request.method === "GET") {
-        return await renderReviewConfirmation(request, env, responder);
       }
 
       if (path === "/api/leaderboard/review-queue" && request.method === "GET") {

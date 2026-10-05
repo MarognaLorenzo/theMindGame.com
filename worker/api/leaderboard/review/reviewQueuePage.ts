@@ -16,7 +16,7 @@ function renderQueueSection(title: string, entries: PendingReviewEntry[], key: s
   }
   const rows = entries
     .map((entry) => {
-      const query = `id=${entry.id}&key=${encodeURIComponent(key)}&from=queue`;
+      const query = `id=${entry.id}&key=${encodeURIComponent(key)}`;
       return `
         <li>
           <div>
@@ -39,7 +39,7 @@ function renderPublishedSection(playerCount: number, entries: PublishedEntry[], 
   }
   const rows = entries
     .map((entry) => {
-      const query = `id=${entry.id}&key=${encodeURIComponent(key)}&from=published`;
+      const query = `id=${entry.id}&key=${encodeURIComponent(key)}`;
       return `
         <li>
           <div>
@@ -107,7 +107,7 @@ export async function renderReviewQueue(
 
   return responder.respondWithHtml(
     renderPage(`
-      <div class="card wide">
+      <div class="card">
         <h1>Leaderboard review</h1>
         ${content}
       </div>
