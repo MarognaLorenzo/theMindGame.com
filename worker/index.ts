@@ -8,6 +8,7 @@ import {
   submitLeaderboardEntry,
   approveLeaderboardEntry,
   denyLeaderboardEntry,
+  removeLeaderboardEntry,
 } from "./api/leaderboard/leaderboardOperations.ts";
 import { fetchReviewQueue } from "./api/leaderboard/reviewQueue.ts";
 import { sendReviewDigest } from "./api/leaderboard/reviewNotifier.ts";
@@ -78,6 +79,10 @@ const worker = {
 
       if (path === "/api/leaderboard/deny" && request.method === "POST") {
         return await denyLeaderboardEntry(request, env, responder);
+      }
+
+      if (path === "/api/leaderboard/remove" && request.method === "POST") {
+        return await removeLeaderboardEntry(request, env, responder);
       }
       return responder.respondWithError("Not Found", 404);
     } catch (err) {

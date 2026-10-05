@@ -1,7 +1,12 @@
 import { Env, LobbyRegistry } from "../../index.ts";
 import { Responder } from "../utils/responder.ts";
 import { LEADERBOARD_READ_LIMIT } from "./leaderboardTypes.ts";
-import { fetchReviewQueue, PendingReviewEntry } from "./reviewQueue.ts";
+import {
+  fetchPublishedEntries,
+  fetchReviewQueue,
+  PendingReviewEntry,
+  PublishedEntry,
+} from "./reviewQueue.ts";
 
 // Public read model for a single leaderboard row.
 interface LeaderboardRow {
@@ -128,6 +133,9 @@ function renderPage(body: string): string {
   .queue .meta { color: #9aa7b5; font-size: 0.875rem; }
   .queue .actions { display: flex; gap: 0.5rem; }
   .queue button { margin-top: 0; padding: 0.5rem 1rem; font-size: 0.875rem; }
+  .nav { display: flex; gap: 1.25rem; margin-bottom: 1.5rem; }
+  .nav a { color: #7ce4c0; }
+  .nav a.current { color: #eff3f8; font-weight: 600; text-decoration: none; }
 </style>
 </head><body>${body}</body></html>`;
 }
@@ -140,8 +148,13 @@ function isValidReviewKey(key: string | null, env: Env): key is string {
   return Boolean(env.REVIEW_APPROVAL_KEY) && key === env.REVIEW_APPROVAL_KEY;
 }
 
-function reviewQueuePath(key: string): string {
-  return `/api/leaderboard/review-queue?key=${encodeURIComponent(key)}`;
+// The review page has two views: the pending queue, and what's currently
+// published (where an approved entry can be taken back down).
+type ReviewView = "queue" | "published";
+
+function reviewQueuePath(key: string, view: ReviewView = "queue"): string {
+  const base = `/api/leaderboard/review-queue?key=${encodeURIComponent(key)}`;
+  return view === "published" ? `${base}&view=published` : base;
 }
 
 interface ReviewRequestParams {
@@ -167,10 +180,12 @@ function parseReviewParams(url: URL, env: Env, responder: Responder): ReviewRequ
   return { id, key };
 }
 
-// A pending row can only ever resolve to one of these two terminal states.
+// A pending row resolves to approved or rejected; an approved row can later be
+// removed (taken off the public board after publication).
 const REVIEW_OUTCOME_LABELS: Record<string, string> = {
   approved: "✅ approved",
   rejected: "🚫 rejected",
+  removed: "🗑️ removed",
 };
 
 // GET /api/leaderboard/review?id&key - read-only confirmation page, offering
@@ -229,11 +244,12 @@ export async function renderReviewConfirmation(
   );
 }
 
-async function resolveReview(
+async function transitionEntry(
   request: Request,
   env: Env,
   responder: Responder,
-  targetStatus: "approved" | "rejected",
+  fromStatus: "pending" | "approved",
+  targetStatus: "approved" | "rejected" | "removed",
 ): Promise<Response> {
   const url = new URL(request.url);
   const params = parseReviewParams(url, env, responder);
@@ -241,24 +257,28 @@ async function resolveReview(
     return params;
   }
 
+  // The status guard makes every transition idempotent: a double-click or a
+  // refresh after the fact changes nothing.
   const result = await env.DB.prepare(
-    "UPDATE leaderboard SET status = ? WHERE id = ? AND status = 'pending'",
+    "UPDATE leaderboard SET status = ? WHERE id = ? AND status = ?",
   )
-    .bind(targetStatus, params.id)
+    .bind(targetStatus, params.id, fromStatus)
     .run();
 
-  // Actions taken from the review queue go straight back to it, so the whole
-  // queue can be worked through in one sitting. 303 turns the POST into a GET.
-  if (url.searchParams.get("from") === "queue") {
+  // Actions taken from the review page go straight back to the view they came
+  // from, so it can be worked through in one sitting. 303 turns the POST into
+  // a GET.
+  const from = url.searchParams.get("from");
+  if (from === "queue" || from === "published") {
     return new Response(null, {
       status: 303,
-      headers: { Location: reviewQueuePath(params.key) },
+      headers: { Location: reviewQueuePath(params.key, from) },
     });
   }
 
   if (result.meta.changes === 0) {
     return responder.respondWithHtml(
-      renderCard(`<p>Nothing to do - entry ${params.id} was not pending (already reviewed, or doesn't exist).</p>`),
+      renderCard(`<p>Nothing to do - entry ${params.id} was not ${fromStatus} (already handled, or doesn't exist).</p>`),
     );
   }
 
@@ -290,30 +310,83 @@ function renderQueueSection(title: string, entries: PendingReviewEntry[], key: s
   return `<h2>${title} (${entries.length})</h2><ul class="queue">${rows}</ul>`;
 }
 
-// GET /api/leaderboard/review-queue?key - every pending entry on one page,
-// those that would make the public board first. Read-only like the single
-// review page: each Approve/Deny is its own POST form.
+function renderPublishedSection(playerCount: number, entries: PublishedEntry[], key: string): string {
+  if (entries.length === 0) {
+    return "";
+  }
+  const rows = entries
+    .map((entry) => {
+      const query = `id=${entry.id}&key=${encodeURIComponent(key)}&from=published`;
+      return `
+        <li>
+          <div>
+            <strong>#${entry.rank} ${escapeHtml(entry.team_name)}</strong> (${escapeHtml(entry.country_code)})<br>
+            <span class="meta">${entry.final_seconds.toFixed(1)}s · ${escapeHtml(entry.created_at)} UTC</span>
+          </div>
+          <div class="actions">
+            <form method="POST" action="/api/leaderboard/remove?${query}" onsubmit="return confirm('Take this entry off the public leaderboard?')">
+              <button type="submit" class="deny">Remove</button>
+            </form>
+          </div>
+        </li>`;
+    })
+    .join("");
+  return `<h2>${playerCount} players (${entries.length})</h2><ul class="queue">${rows}</ul>`;
+}
+
+function renderReviewNav(key: string, current: ReviewView, pendingCount: number): string {
+  const link = (view: ReviewView, label: string) =>
+    `<a href="${reviewQueuePath(key, view)}"${view === current ? ' class="current"' : ""}>${label}</a>`;
+  return `<nav class="nav">${link("queue", `Pending (${pendingCount})`)}${link("published", "Published")}</nav>`;
+}
+
+async function renderQueueView(env: Env, key: string): Promise<string> {
+  const queue = await fetchReviewQueue(env.DB);
+  const body =
+    queue.length === 0
+      ? "<p>Nothing to review - the queue is empty. 🎉</p>"
+      : renderQueueSection(`🏆 Would make the top ${LEADERBOARD_READ_LIMIT}`, queue.filter((e) => e.makesBoard), key) +
+        renderQueueSection(`Wouldn't make the top ${LEADERBOARD_READ_LIMIT}`, queue.filter((e) => !e.makesBoard), key);
+  return renderReviewNav(key, "queue", queue.length) + body;
+}
+
+async function renderPublishedView(env: Env, key: string): Promise<string> {
+  const [queue, published] = await Promise.all([fetchReviewQueue(env.DB), fetchPublishedEntries(env.DB)]);
+  const body =
+    published.length === 0
+      ? "<p>Nothing is published yet.</p>"
+      : VALID_PLAYER_COUNTS.map((count) =>
+          renderPublishedSection(count, published.filter((e) => e.player_count === count), key),
+        ).join("");
+  return renderReviewNav(key, "published", queue.length) + body;
+}
+
+// GET /api/leaderboard/review-queue?key[&view=published] - the moderation page.
+// Default view: every pending entry, those that would make the public board
+// first. Published view: what the public board currently shows, each entry
+// removable. Read-only like the single review page: every action is its own
+// POST form.
 export async function renderReviewQueue(
   request: Request,
   env: Env,
   responder: Responder,
 ): Promise<Response> {
-  const key = new URL(request.url).searchParams.get("key");
+  const url = new URL(request.url);
+  const key = url.searchParams.get("key");
   if (!isValidReviewKey(key, env)) {
     return responder.respondWithError("Invalid or missing key", 403);
   }
 
-  const queue = await fetchReviewQueue(env.DB);
-  if (queue.length === 0) {
-    return responder.respondWithHtml(renderCard("<p>Nothing to review - the queue is empty. 🎉</p>"));
-  }
+  const content =
+    url.searchParams.get("view") === "published"
+      ? await renderPublishedView(env, key)
+      : await renderQueueView(env, key);
 
   return responder.respondWithHtml(
     renderPage(`
       <div class="card wide">
         <h1>Leaderboard review</h1>
-        ${renderQueueSection(`🏆 Would make the top ${LEADERBOARD_READ_LIMIT}`, queue.filter((e) => e.makesBoard), key)}
-        ${renderQueueSection(`Wouldn't make the top ${LEADERBOARD_READ_LIMIT}`, queue.filter((e) => !e.makesBoard), key)}
+        ${content}
       </div>
     `),
   );
@@ -321,10 +394,17 @@ export async function renderReviewQueue(
 
 // POST /api/leaderboard/approve?id&key - the actual mutation.
 export function approveLeaderboardEntry(request: Request, env: Env, responder: Responder): Promise<Response> {
-  return resolveReview(request, env, responder, "approved");
+  return transitionEntry(request, env, responder, "pending", "approved");
 }
 
 // POST /api/leaderboard/deny?id&key - the actual mutation.
 export function denyLeaderboardEntry(request: Request, env: Env, responder: Responder): Promise<Response> {
-  return resolveReview(request, env, responder, "rejected");
+  return transitionEntry(request, env, responder, "pending", "rejected");
+}
+
+// POST /api/leaderboard/remove?id&key - takes an approved entry back off the
+// public board. Only that one row: other entries under the same team name
+// stay published (and keep the name auto-approvable).
+export function removeLeaderboardEntry(request: Request, env: Env, responder: Responder): Promise<Response> {
+  return transitionEntry(request, env, responder, "approved", "removed");
 }

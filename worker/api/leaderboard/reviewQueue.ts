@@ -36,3 +36,34 @@ export async function fetchReviewQueue(db: D1Database): Promise<PendingReviewEnt
     makesBoard: makes_board === 1,
   }));
 }
+
+export interface PublishedEntry {
+  id: number;
+  team_name: string;
+  country_code: string;
+  player_count: number;
+  final_seconds: number;
+  created_at: string;
+  // 1-based position on the public board for its team size.
+  rank: number;
+}
+
+// Exactly what the public leaderboard shows: the top LEADERBOARD_READ_LIMIT
+// approved entries per team size. Approved rows below the cut-off aren't
+// visible to anyone, so moderation doesn't need to see them either.
+export async function fetchPublishedEntries(db: D1Database): Promise<PublishedEntry[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT * FROM (
+         SELECT id, team_name, country_code, player_count, final_seconds, created_at,
+                ROW_NUMBER() OVER (PARTITION BY player_count ORDER BY final_seconds ASC) AS rank
+           FROM leaderboard
+          WHERE status = 'approved'
+       )
+        WHERE rank <= ?
+        ORDER BY player_count ASC, rank ASC`,
+    )
+    .bind(LEADERBOARD_READ_LIMIT)
+    .all<PublishedEntry>();
+  return results;
+}
