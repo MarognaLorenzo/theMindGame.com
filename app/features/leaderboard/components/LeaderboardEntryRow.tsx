@@ -60,12 +60,14 @@ const TOP_TIER_STYLE: RankStyle = {
   score: "text-lg text-[var(--accent)]",
 };
 
+// The long tail is deliberately denser and quieter, which is what lets the
+// tiers above it stand out without louder colours.
 const DEFAULT_STYLE: RankStyle = {
-  row: "py-3 border-[var(--border-subtle)] bg-[var(--surface-2)]",
-  rank: "text-sm text-[var(--text-muted)]",
-  flag: "text-2xl",
-  name: "text-base",
-  score: "text-lg text-[var(--accent)]",
+  row: "py-2 border-[var(--border-subtle)] bg-[var(--surface-2)]",
+  rank: "text-xs text-[var(--text-muted)]",
+  flag: "text-xl",
+  name: "text-sm",
+  score: "text-base text-[var(--accent)]",
 };
 
 function rankStyle(rank: number): RankStyle {
@@ -86,7 +88,7 @@ export function LeaderboardEntryRow({ rank, entry }: LeaderboardEntryRowProps) {
           {isPodium ? rank : `#${rank}`}
         </span>
       </span>
-      <span className={`leading-none ${style.flag}`} aria-hidden="true">
+      <span className={`w-8 shrink-0 text-center leading-none ${style.flag}`} aria-hidden="true">
         {countryCodeToFlagEmoji(entry.countryCode)}
       </span>
       <div className="min-w-0 flex-1">
