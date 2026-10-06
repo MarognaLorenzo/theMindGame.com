@@ -8,6 +8,9 @@ interface LeaderboardEntryRowProps {
   entry: LeaderboardEntry;
 }
 
+// Rows above this rank get the "top" accent; the modal draws its divider here.
+export const TOP_TIER_SIZE = 10;
+
 const STAT_ICON_CLASSNAME = "h-3.5 w-3.5";
 
 // Sizes live here too (not in the shared classes) so a tier can override them
@@ -47,6 +50,16 @@ const PODIUM_STYLES: Record<number, RankStyle> = {
   },
 };
 
+const TOP_TIER_STYLE: RankStyle = {
+  // Inset shadow rather than a thicker left border, so the stripe doesn't
+  // push this row's contents out of line with the rows around it.
+  row: "py-3 border-[var(--border-subtle)] bg-[var(--surface-2)] shadow-[inset_3px_0_0_var(--accent)]",
+  rank: "text-sm text-[var(--accent)]",
+  flag: "text-2xl",
+  name: "text-base",
+  score: "text-lg text-[var(--accent)]",
+};
+
 const DEFAULT_STYLE: RankStyle = {
   row: "py-3 border-[var(--border-subtle)] bg-[var(--surface-2)]",
   rank: "text-sm text-[var(--text-muted)]",
@@ -56,7 +69,7 @@ const DEFAULT_STYLE: RankStyle = {
 };
 
 function rankStyle(rank: number): RankStyle {
-  return PODIUM_STYLES[rank] ?? DEFAULT_STYLE;
+  return PODIUM_STYLES[rank] ?? (rank <= TOP_TIER_SIZE ? TOP_TIER_STYLE : DEFAULT_STYLE);
 }
 
 export function LeaderboardEntryRow({ rank, entry }: LeaderboardEntryRowProps) {
