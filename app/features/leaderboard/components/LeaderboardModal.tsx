@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useLeaderboardEntries } from "../hooks/useLeaderboardEntries";
-import { LeaderboardEntryRow } from "./LeaderboardEntryRow";
+import { LeaderboardEntryRow, TOP_TIER_SIZE } from "./LeaderboardEntryRow";
 import { ScoreInfoTooltip } from "./ScoreInfoTooltip";
 
 const PLAYER_COUNTS = [2, 3, 4] as const;
@@ -91,11 +91,14 @@ export function LeaderboardModal({ workerBaseUrl, onClose }: LeaderboardModalPro
           {status === "loaded" && entries.length > 0 ? (
             <ol className="space-y-2">
               {entries.map((entry, index) => (
-                <LeaderboardEntryRow
-                  key={`${entry.teamName}-${entry.createdAt}-${index}`}
-                  rank={index + 1}
-                  entry={entry}
-                />
+                <Fragment key={`${entry.teamName}-${entry.createdAt}-${index}`}>
+                  <LeaderboardEntryRow rank={index + 1} entry={entry} />
+                  {index + 1 === TOP_TIER_SIZE && entries.length > TOP_TIER_SIZE ? (
+                    <li aria-hidden="true" className="py-2">
+                      <div className="h-px bg-[var(--border-subtle)]" />
+                    </li>
+                  ) : null}
+                </Fragment>
               ))}
             </ol>
           ) : null}
