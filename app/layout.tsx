@@ -61,6 +61,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <script
+          src="https://analytics.ahrefs.com/analytics.js"
+          data-key="XMS/tE+MoiqU6OJWbUoikw"
+          async
+        />
+      </head>
       <body
         className={`${spaceGrotesk.variable} ${spaceMono.variable} antialiased`}
       >
